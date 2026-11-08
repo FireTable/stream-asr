@@ -1,6 +1,10 @@
 <p align="center">
-  <a href="https://asr.firetable.tech" target="_blank" rel="noopener noreferrer">
-    <img src="https://asr.firetable.tech/favicon.svg" width="96" height="96" alt="Stream ASR Logo" />
+  <a href="https://asr.firetable.tech">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/FireTable/stream-asr/main/assets/logo-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/FireTable/stream-asr/main/assets/logo-light.svg">
+      <img alt="Stream ASR Logo" src="https://raw.githubusercontent.com/FireTable/stream-asr/main/assets/logo-dark.svg" width="96" height="96">
+    </picture>
   </a>
 </p>
 
