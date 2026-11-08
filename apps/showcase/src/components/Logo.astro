@@ -3,7 +3,10 @@ interface Props {
   className?: string;
   size?: number;
 }
-const { className = "w-6 h-6 shrink-0", size = 26 } = Astro.props;
+const { className = "w-[22px] h-[22px] sm:w-[26px] sm:h-[26px] shrink-0", size } = Astro.props;
+const uid = Math.random().toString(36).substring(2, 8);
+const gradDark = `mobius-grad-dark-${uid}`;
+const gradLight = `mobius-grad-light-${uid}`;
 ---
 
 <svg
@@ -13,17 +16,18 @@ const { className = "w-6 h-6 shrink-0", size = 26 } = Astro.props;
   fill="none"
   xmlns="http://www.w3.org/2000/svg"
   class={className}
+  aria-hidden="true"
 >
   <defs>
     <!-- Dark Mode Foreground Ribbon: Sky Cyan -> Pure White Crest -> Azure -->
-    <linearGradient id="mobius-grad-dark" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id={gradDark} x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#38bdf8" />
       <stop offset="45%" stop-color="#ffffff" />
       <stop offset="100%" stop-color="#0284c7" />
     </linearGradient>
 
     <!-- Light Mode Foreground Ribbon: Deep Azure -> Vivid Sky Cyan -> Sapphire -->
-    <linearGradient id="mobius-grad-light" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id={gradLight} x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0284c7" />
       <stop offset="45%" stop-color="#0ea5e9" />
       <stop offset="100%" stop-color="#0369a1" />
@@ -43,7 +47,7 @@ const { className = "w-6 h-6 shrink-0", size = 26 } = Astro.props;
     <!-- Luminous Crest Ribbon (Front) -->
     <path
       d="M7 21 C4 17 5 11 10 8 C15 5 21 8 22 13 C23 18 29 20 29 16"
-      stroke="url(#mobius-grad-dark)"
+      stroke={`url(#${gradDark})`}
       stroke-width="3.6"
       stroke-linecap="round"
     />
@@ -62,7 +66,7 @@ const { className = "w-6 h-6 shrink-0", size = 26 } = Astro.props;
     <!-- Rich Contrast Ribbon (Front) -->
     <path
       d="M7 21 C4 17 5 11 10 8 C15 5 21 8 22 13 C23 18 29 20 29 16"
-      stroke="url(#mobius-grad-light)"
+      stroke={`url(#${gradLight})`}
       stroke-width="3.6"
       stroke-linecap="round"
     />
