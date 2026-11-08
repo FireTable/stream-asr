@@ -149,7 +149,7 @@ const currentYear = new Date().getFullYear();
              MONUMENTAL HERO SECTION
              Text + Big Ball + Immersive Movie-Subtitle Streaming (No Card Box)
              ========================================================= -->
-        <section id="hero" class="w-full min-h-screen min-h-[100dvh] flex flex-col items-center justify-center text-center px-4 sm:px-6 lg:px-8 pt-14 sm:pt-18 md:pt-20 pb-8 relative overflow-x-clip">
+        <section id="hero" class="w-full min-h-[100dvh] flex flex-col items-center justify-start sm:justify-center text-center px-4 sm:px-6 lg:px-8 pt-14 sm:pt-20 md:pt-24 pb-6 sm:pb-12 relative overflow-x-clip">
           {/* Ambient Hero Spotlight & Mesh with Smooth Vertical Feathering (Eliminates Hard Bottom Cutoffs) */}
           <div 
             aria-hidden="true" 
@@ -160,22 +160,49 @@ const currentYear = new Date().getFullYear();
             <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[540px] h-[540px] bg-sky-500/10 dark:bg-sky-400/10 rounded-full blur-[120px] pointer-events-none" />
           </div>
 
-          <!-- Monumental Headline: Majestic & Clean (No Gimmick Badges) with BlurText Reveal -->
-          <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 max-w-5xl leading-[1.2] sm:leading-[1.16] mb-5 sm:mb-6 px-2 animate-blur-reveal">
-            <span class="inline-block" data-i18n="hero.titlePre">极速纯端侧</span> <br class="hidden sm:inline" />
-            <span class="inline-block text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-cyan-500 to-sky-500 dark:from-sky-400 dark:via-cyan-300 dark:to-sky-200 px-1 pb-2 pt-0.5 -mb-2 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]" data-i18n="hero.titleSpan">
-              流式语音识别引擎
-            </span>
-          </h1>
+          <!-- Hero Content Wrapper: Vertically balanced on mobile, centered on desktop -->
+          <div class="w-full max-w-5xl flex flex-col items-center mt-2 sm:mt-0 mb-auto sm:my-auto py-1 sm:py-0">
+            <!-- Tech pill badge on mobile & desktop -->
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium text-sky-600 dark:text-sky-300/90 bg-sky-500/10 border border-sky-500/20 mb-2 sm:mb-3 backdrop-blur-sm animate-blur-reveal">
+              <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+              <span data-i18n="hero.badge">WebAssembly SIMD128 · 0.46x RTF · 中文 / 英文 纯端侧</span>
+            </div>
 
-          <!-- Subtitle -->
-          <p data-i18n="hero.subtitle" class="text-xs sm:text-sm md:text-base text-zinc-600 dark:text-zinc-400 max-w-2xl leading-relaxed mx-auto mb-2 sm:mb-3 text-balance px-4 animate-blur-reveal-delay">
-            在浏览器内直接运行的纯端侧流式语音识别。支持中文与英文，说话实时上屏，音频绝不上云，断网也能秒级转写。
-          </p>
+            <!-- Monumental Headline: Majestic & Clean (No Gimmick Badges) with BlurText Reveal -->
+            <h1 class="text-[1.85rem] sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 max-w-5xl leading-[1.2] sm:leading-[1.16] mb-2 sm:mb-4 px-2 animate-blur-reveal">
+              <span class="block sm:inline" data-i18n="hero.titlePre">极速纯端侧</span>
+              <span class="inline-block text-transparent bg-clip-text bg-gradient-to-r from-sky-600 via-cyan-500 to-sky-500 dark:from-sky-400 dark:via-cyan-300 dark:to-sky-200 px-1 pb-1 sm:pb-2 pt-0.5 -mb-1 sm:-mb-2 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]" data-i18n="hero.titleSpan">
+                流式语音识别引擎
+              </span>
+            </h1>
 
-          <!-- THE BIG HERO BALL + IMMERSIVE MOVIE-SUBTITLE STREAMING -->
-          <div class="w-full mt-1 sm:mt-2 flex flex-col items-center justify-center">
-            <SoundLabHeroOrb client:load />
+            <!-- Subtitle -->
+            <p data-i18n="hero.subtitle" class="text-xs sm:text-sm md:text-base text-zinc-600 dark:text-zinc-400 max-w-[340px] sm:max-w-xl md:max-w-2xl leading-relaxed mx-auto mb-2 sm:mb-4 text-balance px-2 sm:px-4 animate-blur-reveal-delay">
+              在浏览器内直接运行的纯端侧流式语音识别。支持中文与英文，说话实时上屏，音频绝不上云，断网也能秒级转写。
+            </p>
+
+            <!-- THE BIG HERO BALL + IMMERSIVE MOVIE-SUBTITLE STREAMING -->
+            <div class="w-full mt-0.5 sm:mt-2 flex flex-col items-center justify-center">
+              <SoundLabHeroOrb client:load />
+            </div>
+
+            <!-- Mobile Feature Highlights Pills below buttons -->
+            <div class="flex items-center justify-center gap-2 sm:gap-4 mt-2.5 sm:mt-4 text-[10px] sm:text-xs text-zinc-500 dark:text-zinc-400 font-mono select-none whitespace-nowrap">
+              <span class="inline-flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                <span data-i18n="hero.specNoCloud">0 音频上云</span>
+              </span>
+              <span class="text-zinc-300 dark:text-zinc-700">·</span>
+              <span class="inline-flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                <span data-i18n="hero.specRtf">0.45x RTF 极速</span>
+              </span>
+              <span class="text-zinc-300 dark:text-zinc-700">·</span>
+              <span class="inline-flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                <span data-i18n="hero.specWasm">2.2 MB 核心</span>
+              </span>
+            </div>
           </div>
         </section>
 

@@ -67,6 +67,7 @@ const recognizer = new StreamRecognizer({
   modelUrl: '/model.bin',           // Path or URL to model binary container
   wasmBaseUrl: '/wasm',             // Directory hosting stream_asr.wasm and stream_asr.js
   mode: 3,                          // 3 = Universal Streaming + Neural VAD (Default)
+  numThreads: 'auto',               // 'auto' (detects COOP/COEP isolation) | 1 | 2 | 4
   vadThreshold: 0.5,                // Speech activation sensitivity (0.0 ~ 1.0)
   enableCache: true,                // Enable IndexedDB offline cache
 });

@@ -32,6 +32,9 @@ export const translations = {
     },
     hero: {
       badge: "WebAssembly SIMD128 · 0.46x RTF · Chinese & English",
+      specNoCloud: "Zero Cloud Audio",
+      specRtf: "0.45x RTF Speed",
+      specWasm: "2.2 MB Wasm Core",
       titlePre: "Ultra-Fast On-Device",
       titleSpan: "Streaming Speech Recognition",
       subtitle: "Fast, browser-native streaming speech recognition supporting Chinese and English. Transcribe voice in real time with zero latency, zero cloud API costs, and total offline privacy.",
@@ -174,6 +177,9 @@ export const translations = {
     },
     hero: {
       badge: "WebAssembly SIMD128 · 0.46x RTF · 中文 / 英文 纯端侧",
+      specNoCloud: "0 音频上云",
+      specRtf: "0.45x RTF 极速",
+      specWasm: "2.2 MB 核心",
       titlePre: "极速纯端侧",
       titleSpan: "流式语音识别引擎",
       subtitle: "在浏览器内直接运行的纯端侧流式语音识别。支持中文与英文，说话实时上屏，音频绝不上云，断网也能秒级转写。",
@@ -316,6 +322,9 @@ export const translations = {
     },
     hero: {
       badge: "WebAssembly SIMD128 · 0.46x RTF · 中文 / 英文 純端側",
+      specNoCloud: "0 音訊上雲",
+      specRtf: "0.45x RTF 極速",
+      specWasm: "2.2 MB 核心",
       titlePre: "極速純端側",
       titleSpan: "串流語音識別引擎",
       subtitle: "在瀏覽器內直接運行的純端側串流語音識別。支援中文與英文，說話即時上屏，音訊絕不上雲，斷網亦能秒級轉寫。",

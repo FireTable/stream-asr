@@ -79,6 +79,7 @@ export default function SoundLabHeroOrb() {
     inferenceMs: 0,
     audioDuration: 0
   });
+  const [activeThreads, setActiveThreads] = useState<number>(1);
 
   const recognizerRef = useRef<StreamRecognizer | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -333,8 +334,15 @@ export default function SoundLabHeroOrb() {
           modelUrl: (import.meta.env.PUBLIC_MODEL_URL as string) || '/model_chunks/model.json',
           wasmBaseUrl: '/wasm',
           mode: 3, // Strict Mode 3: Universal Streaming with Neural VAD
+          numThreads: 'auto',
           vadThreshold: 0.5,
           enableCache: true
+        });
+
+        recognizer.on('ready', (readyEvt) => {
+          if (readyEvt && typeof readyEvt.threads === 'number') {
+            setActiveThreads(readyEvt.threads);
+          }
         });
 
         recognizer.on('recognizing', ({ text }) => {
@@ -725,8 +733,8 @@ export default function SoundLabHeroOrb() {
       {/* Background Living Dynamic Resonance Aura */}
       <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none transition-all duration-700 ease-out ${
         isRecording || isPlayingTest
-          ? 'w-[360px] h-[360px] sm:w-[540px] sm:h-[540px] bg-sky-400/20 blur-[90px] sm:blur-[150px]'
-          : 'w-[260px] h-[260px] sm:w-[380px] sm:h-[380px] bg-sky-400/10 blur-[80px] sm:blur-[120px]'
+          ? 'w-[300px] h-[300px] sm:w-[540px] sm:h-[540px] bg-sky-400/20 blur-[80px] sm:blur-[150px]'
+          : 'w-[200px] h-[200px] sm:w-[380px] sm:h-[380px] bg-sky-400/10 blur-[60px] sm:blur-[120px]'
       }`} />
 
       {/* Living Monumental Hero Orb: Click to Toggle Recording Directly */}
@@ -746,17 +754,17 @@ export default function SoundLabHeroOrb() {
           CINEMATIC STREAMING TRANSCRIPTION DIRECTLY UNDER THE BALL
           Single-Line Cinema Subtitle with Fade-in Motion & Zero CLS
           ========================================================= */}
-      <div className="w-full max-w-4xl px-4 mt-2 sm:mt-2.5 flex flex-col items-center">
+      <div className="w-full max-w-4xl px-4 mt-1 sm:mt-2 flex flex-col items-center">
         {/* Relative Subtitle Frame with 100% Height-Uniform Horizontal Feathering */}
         <div className="relative w-full max-w-2xl sm:max-w-3xl flex items-center justify-center">
           {/* Single-Line Subtitle Container with Stable Reserved Height & Full-Height Linear Horizontal Mask */}
           <div 
             ref={scrollContainerRef}
-            className="w-full h-11 sm:h-12 overflow-x-auto no-scrollbar scroll-smooth flex items-center px-10 sm:px-14 [mask-image:linear-gradient(to_right,transparent_0%,black_48px,black_calc(100%-48px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,transparent_0%,black_48px,black_calc(100%-48px),transparent_100%)]"
+            className="w-full h-10 sm:h-12 overflow-x-auto no-scrollbar scroll-smooth flex items-center px-8 sm:px-14 [mask-image:linear-gradient(to_right,transparent_0%,black_48px,black_calc(100%-48px),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,transparent_0%,black_48px,black_calc(100%-48px),transparent_100%)]"
           >
             <div className="min-w-full flex items-center justify-center py-1">
               {transcript ? (
-                <div className="whitespace-nowrap text-xl sm:text-2xl md:text-3xl font-light text-zinc-900 dark:text-zinc-100 tracking-normal drop-shadow-sm dark:drop-shadow-md select-text flex items-center leading-normal">
+                <div className="whitespace-nowrap text-lg sm:text-2xl md:text-3xl font-light text-zinc-900 dark:text-zinc-100 tracking-normal drop-shadow-sm dark:drop-shadow-md select-text flex items-center leading-normal">
                   {/* Leading Whitespace Spacer */}
                   <span aria-hidden="true" className="inline-block w-4 shrink-0 whitespace-pre">&nbsp;</span>
                   {transcript.split('').map((char, index) => (
@@ -789,11 +797,11 @@ export default function SoundLabHeroOrb() {
 
         {/* Control Buttons: Strict Fixed Height Container (Eliminates all CLS & Page Shifting) */}
         <div 
-          className="w-full max-w-[280px] sm:max-w-[300px] h-[96px] flex flex-col items-stretch justify-center gap-2 mt-2 sm:mt-2.5 mx-auto"
+          className="w-full max-w-[270px] sm:max-w-[300px] h-[88px] sm:h-[96px] flex flex-col items-stretch justify-center gap-1.5 sm:gap-2 mt-1 sm:mt-2 mx-auto"
         >
           {/* Top Button: Start/Stop Speech Recording */}
           {isRecording ? (
-            <div className="relative w-full h-11 p-[1px] overflow-hidden rounded-full bg-zinc-200/80 dark:bg-white/15 shadow-[0_0_24px_-4px_rgba(56,189,248,0.35)] active:scale-[0.98] transition-transform duration-150">
+            <div className="relative w-full h-10 sm:h-11 p-[1px] overflow-hidden rounded-full bg-zinc-200/80 dark:bg-white/15 shadow-[0_0_24px_-4px_rgba(56,189,248,0.35)] active:scale-[0.98] transition-transform duration-150">
               {/* React Bits Rotating Border Beam */}
               <span
                 aria-hidden="true"
@@ -812,7 +820,7 @@ export default function SoundLabHeroOrb() {
           ) : isPlayingTest ? (
             <button
               disabled
-              className="w-full h-11 inline-flex items-center justify-center gap-2 px-6 rounded-full text-xs sm:text-sm font-medium text-zinc-400 dark:text-zinc-600 bg-zinc-900/[0.03] dark:bg-white/[0.03] border border-zinc-900/5 dark:border-white/[0.04] opacity-40 cursor-not-allowed whitespace-nowrap"
+              className="w-full h-10 sm:h-11 inline-flex items-center justify-center gap-2 px-6 rounded-full text-xs sm:text-sm font-medium text-zinc-400 dark:text-zinc-600 bg-zinc-900/[0.03] dark:bg-white/[0.03] border border-zinc-900/5 dark:border-white/[0.04] opacity-40 cursor-not-allowed whitespace-nowrap"
             >
               <Mic className="w-4 h-4 text-current" />
               <span className="whitespace-nowrap">{t.startSpeaking || '点击说话'}</span>
@@ -821,7 +829,7 @@ export default function SoundLabHeroOrb() {
             <button
               onClick={toggleRecording}
               disabled={isInitializing}
-              className="w-full h-11 group relative overflow-hidden inline-flex items-center justify-center gap-2 px-6 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 active:scale-[0.98] select-none shadow-sm text-zinc-800 hover:text-zinc-950 bg-zinc-900/[0.06] hover:bg-zinc-900/[0.10] border border-zinc-900/10 hover:border-zinc-900/20 dark:text-zinc-200 dark:hover:text-white dark:bg-white/[0.06] dark:hover:bg-white/[0.10] dark:border-white/[0.08] dark:hover:border-white/[0.16]"
+              className="w-full h-10 sm:h-11 group relative overflow-hidden inline-flex items-center justify-center gap-2 px-6 rounded-full text-xs sm:text-sm font-medium transition-all duration-200 active:scale-[0.98] select-none shadow-sm text-zinc-800 hover:text-zinc-950 bg-zinc-900/[0.06] hover:bg-zinc-900/[0.10] border border-zinc-900/10 hover:border-zinc-900/20 dark:text-zinc-200 dark:hover:text-white dark:bg-white/[0.06] dark:hover:bg-white/[0.10] dark:border-white/[0.08] dark:hover:border-white/[0.16]"
             >
               {isInitializing ? (
                 <>
@@ -860,7 +868,7 @@ export default function SoundLabHeroOrb() {
 
           {/* Bottom Button: Sample Audio Playback or Stop Playback */}
           {isPlayingTest ? (
-            <div className="relative w-full h-11 p-[1px] overflow-hidden rounded-full bg-zinc-200/80 dark:bg-white/15 shadow-[0_0_24px_-4px_rgba(56,189,248,0.35)] active:scale-[0.98] transition-transform duration-150">
+            <div className="relative w-full h-10 sm:h-11 p-[1px] overflow-hidden rounded-full bg-zinc-200/80 dark:bg-white/15 shadow-[0_0_24px_-4px_rgba(56,189,248,0.35)] active:scale-[0.98] transition-transform duration-150">
               {/* React Bits Rotating Border Beam */}
               <span
                 aria-hidden="true"
@@ -880,7 +888,7 @@ export default function SoundLabHeroOrb() {
               </button>
             </div>
           ) : isRecording ? (
-            <div className="relative w-full h-11 flex items-center justify-center rounded-full bg-zinc-900/[0.03] dark:bg-white/[0.03] border border-zinc-900/5 dark:border-white/[0.04] opacity-40 cursor-not-allowed">
+            <div className="relative w-full h-10 sm:h-11 flex items-center justify-center rounded-full bg-zinc-900/[0.03] dark:bg-white/[0.03] border border-zinc-900/5 dark:border-white/[0.04] opacity-40 cursor-not-allowed">
               <span className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium text-zinc-400 dark:text-zinc-600">
                 <Play className="w-3.5 h-3.5 text-current fill-current opacity-30" />
                 <span>{t.testAudio || '试听样本'}</span>
@@ -889,7 +897,7 @@ export default function SoundLabHeroOrb() {
           ) : (
             <div 
               ref={sampleMenuRef} 
-              className="relative w-full h-11 flex items-center justify-center rounded-full bg-zinc-900/[0.04] hover:bg-zinc-900/[0.08] border border-zinc-900/10 hover:border-zinc-900/20 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:border-white/[0.08] dark:hover:border-white/[0.16] transition-all duration-200 shadow-sm"
+              className="relative w-full h-10 sm:h-11 flex items-center justify-center rounded-full bg-zinc-900/[0.04] hover:bg-zinc-900/[0.08] border border-zinc-900/10 hover:border-zinc-900/20 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:border-white/[0.08] dark:hover:border-white/[0.16] transition-all duration-200 shadow-sm"
             >
               <button
                 onClick={() => runTestAudio()}
@@ -1049,7 +1057,7 @@ export default function SoundLabHeroOrb() {
 
               {/* Drawer Footer: Matching subtle bar */}
               <div className="relative z-20 px-4 py-2 sm:px-5 sm:py-2.5 border-t border-zinc-200/80 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-white/[0.02] text-[10px] text-zinc-400 dark:text-zinc-500 flex items-center justify-between select-none">
-                <span>{tc.footerNative}</span>
+                <span>{activeThreads > 1 ? `Multi-Worker (${activeThreads} Threads · SIMD128)` : 'Single Worker (SIMD128)'}</span>
                 <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-zinc-200/60 dark:bg-white/[0.06] text-zinc-600 dark:text-zinc-400">
                   {tc.footerMode}
                 </span>

@@ -1,7 +1,7 @@
 .snd-orb {
   position: relative;
-  width: clamp(220px, 32vh, 280px);
-  height: clamp(220px, 32vh, 280px);
+  width: clamp(190px, 27vh, 240px);
+  height: clamp(190px, 27vh, 240px);
   border-radius: 50%;
   display: flex;
   align-items: center;
