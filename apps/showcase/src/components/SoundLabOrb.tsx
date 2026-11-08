@@ -595,16 +595,6 @@ export default function SoundLabOrb({
       }}
       aria-label="Sound Lab Acoustic Sphere"
     >
-      {/* Aesthetic fallback sphere: guarantees beautiful aesthetics even during WebGL compile/restore & prevents white box */}
-      <div
-        className={`snd-orb-fallback absolute inset-0 rounded-full transition-opacity duration-500 pointer-events-none ${
-          isGlReady ? 'opacity-0' : 'opacity-100'
-        }`}
-        aria-hidden="true"
-      >
-        <div className="absolute inset-0 rounded-full border border-sky-400/25 dark:border-sky-400/20 shadow-[inset_0_0_24px_rgba(56,189,248,0.18)]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-1/3 bg-gradient-to-r from-transparent via-sky-300/20 dark:via-sky-200/25 to-transparent blur-md rounded-full" />
-      </div>
       <canvas
         ref={canvasRef}
         className={`snd-orb-canvas absolute inset-0 w-full h-full block rounded-full transition-opacity duration-300 pointer-events-none ${

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Mic, Play, RefreshCw, Square, Terminal, X, ChevronDown } from 'lucide-react';
+import { Mic, Play, RefreshCw, Square, Terminal, X, ChevronDown, ArrowDown } from 'lucide-react';
 import SoundLabOrb from './SoundLabOrb';
 import { StreamRecognizer, type LogEvent } from '@firetable/stream-asr';
 import { translations, getInitialLang, type Lang } from '../i18n/translations';
@@ -80,6 +80,8 @@ export default function SoundLabHeroOrb() {
     audioDuration: 0
   });
   const [activeThreads, setActiveThreads] = useState<number>(1);
+  const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+  const isUserScrolledUpRef = useRef(false);
 
   const recognizerRef = useRef<StreamRecognizer | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -122,11 +124,51 @@ export default function SoundLabHeroOrb() {
     }
   }, [transcript]);
 
+  // User scroll listener: detect if user scrolled up away from bottom
+  const handleLogScroll = () => {
+    const el = logContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isUp = distanceFromBottom > 35;
+    isUserScrolledUpRef.current = isUp;
+    setIsUserScrolledUp(isUp);
+  };
+
+  const scrollToBottom = (smooth = true) => {
+    isUserScrolledUpRef.current = false;
+    setIsUserScrolledUp(false);
+    if (logContainerRef.current) {
+      if (smooth) {
+        logContainerRef.current.scrollTo({
+          top: logContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      } else {
+        logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+      }
+    }
+  };
+
+  // Auto-scroll when new logs arrive, ONLY IF user is not inspecting previous logs
   useEffect(() => {
-    if (showLogs && logContainerRef.current) {
+    if (!showLogs || !logContainerRef.current) return;
+    if (!isUserScrolledUpRef.current) {
       logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
     }
-  }, [logs, showLogs]);
+  }, [logs]);
+
+  // When drawer opens, reset scrolled-up lock and scroll to bottom once
+  useEffect(() => {
+    if (showLogs) {
+      isUserScrolledUpRef.current = false;
+      setIsUserScrolledUp(false);
+      requestAnimationFrame(() => {
+        if (logContainerRef.current) {
+          logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+        }
+      });
+    }
+  }, [showLogs]);
 
   // Isolate debug drawer scrolling: strictly prevent scroll chaining / penetration to background page
   useEffect(() => {
@@ -140,6 +182,7 @@ export default function SoundLabHeroOrb() {
       e.stopPropagation();
       if (logEl) {
         logEl.scrollTop += e.deltaY;
+        handleLogScroll();
       }
     };
 
@@ -158,6 +201,7 @@ export default function SoundLabHeroOrb() {
         const deltaY = startY - currentY;
         startY = currentY;
         logEl.scrollTop += deltaY;
+        handleLogScroll();
       }
     };
 
@@ -257,6 +301,13 @@ export default function SoundLabHeroOrb() {
   // Clean unmount lifecycle & idle engine pre-initialization
   useEffect(() => {
     isMountedRef.current = true;
+
+    // Probe environment for expected multi-worker concurrency
+    if (typeof window !== 'undefined' && StreamRecognizer.isMultiWorkerSupported()) {
+      const hwCores = typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 4;
+      const expectedThreads = Math.min(4, Math.max(1, hwCores >= 4 ? 4 : 2));
+      setActiveThreads(expectedThreads);
+    }
 
     // Trigger engine initialization on browser idle to provide zero-wait instant speech
     let idleTimer: any = null;
@@ -394,6 +445,9 @@ export default function SoundLabHeroOrb() {
         });
 
         await recognizer.init();
+        if (typeof recognizer.threads === 'number') {
+          setActiveThreads(recognizer.threads);
+        }
 
         if (idbProgressTimer) {
           clearInterval(idbProgressTimer);
@@ -989,7 +1043,11 @@ export default function SoundLabHeroOrb() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => setLogs([])}
+                    onClick={() => {
+                      setLogs([]);
+                      isUserScrolledUpRef.current = false;
+                      setIsUserScrolledUp(false);
+                    }}
                     className="text-[11px] px-2.5 py-1 rounded-md font-mono transition-colors text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-white/10 active:scale-95"
                     title={tc.clear}
                   >
@@ -1009,6 +1067,7 @@ export default function SoundLabHeroOrb() {
               {/* Log List (Self-contained scroll, isolated from background) */}
               <div 
                 ref={logContainerRef}
+                onScroll={handleLogScroll}
                 className="relative z-10 flex-1 overflow-y-auto px-4 py-2.5 sm:px-5 sm:py-3 space-y-0 select-text font-mono text-[11px] leading-relaxed overscroll-contain debug-scrollbar"
               >
                 {logs.length === 0 ? (
@@ -1055,11 +1114,24 @@ export default function SoundLabHeroOrb() {
                 <div ref={logEndRef} />
               </div>
 
+              {/* Floating Jump to Bottom pill when user has scrolled up to inspect previous logs */}
+              {isUserScrolledUp && (
+                <button
+                  onClick={() => scrollToBottom(true)}
+                  className="absolute bottom-12 right-5 z-30 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-sans font-medium text-sky-600 dark:text-sky-300 bg-white/95 dark:bg-zinc-900/95 border border-sky-400/40 dark:border-sky-500/30 shadow-[0_4px_16px_rgba(0,0,0,0.12),0_2px_4px_rgba(0,0,0,0.08)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-md active:scale-95 transition-all duration-150 animate-in fade-in zoom-in-95 hover:bg-sky-50 dark:hover:bg-zinc-800 select-none cursor-pointer"
+                  title={tc.jumpToBottom || '回到底部'}
+                >
+                  <ArrowDown className="w-3.5 h-3.5 animate-bounce" />
+                  <span>{tc.jumpToBottom || '回到底部'}</span>
+                </button>
+              )}
+
               {/* Drawer Footer: Matching subtle bar */}
-              <div className="relative z-20 px-4 py-2 sm:px-5 sm:py-2.5 border-t border-zinc-200/80 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-white/[0.02] text-[10px] text-zinc-400 dark:text-zinc-500 flex items-center justify-between select-none">
-                <span>{activeThreads > 1 ? `Multi-Worker (${activeThreads} Threads · SIMD128)` : 'Single Worker (SIMD128)'}</span>
-                <span className="font-mono text-[10px] px-2 py-0.5 rounded-md bg-zinc-200/60 dark:bg-white/[0.06] text-zinc-600 dark:text-zinc-400">
-                  {tc.footerMode}
+              <div className="relative z-20 px-4 py-2 sm:px-5 sm:py-2.5 border-t border-zinc-200/80 dark:border-white/[0.08] bg-zinc-50/70 dark:bg-white/[0.02] text-[10px] text-zinc-400 dark:text-zinc-500 flex items-center select-none">
+                <span>
+                  {activeThreads > 1 
+                    ? `Worker 线程: ${activeThreads} (多 Worker 并行 · SIMD128)` 
+                    : 'Worker 线程: 1 (单 Worker · SIMD128)'}
                 </span>
               </div>
             </div>
