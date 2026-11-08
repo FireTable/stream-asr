@@ -5,11 +5,10 @@ name: Publish Package to NPM (@firetable/stream-asr)
 #   - workflow_dispatch -> 手动触发; 默认 dry-run (只构建 + npm publish --dry-run), 取消勾选才真发布
 #
 # 认证模式:
-#   1. 推荐：npm Trusted Publishing (OIDC)，无需在 GitHub 仓库配置静态 NPM_TOKEN secret。
-#      - 需要 id-token: write + GitHub-hosted runner + Node >= 22.14 + npm CLI >= 11.5.1。
-#      - npm CLI 发现 OIDC 环境会自动换取短期凭证并自动生成 provenance。
-#      - 一次性准备：在 npmjs.com 包 Settings -> Trusted publishing 绑定本仓库 (FireTable/stream-asr, workflow: publish.yml)。
-#   2. 兼容模式：如果仓库配置了 secrets.NPM_TOKEN，会自动通过 NODE_AUTH_TOKEN 进行回退发布。
+#   - 纯 npm Trusted Publishing (OIDC):
+#     仓库内无需任何 NPM_TOKEN secret。
+#     通过 id-token: write + GitHub-hosted runner + Node 24 + npm >= 11.5.1，
+#     npm CLI 自动与 npmjs 注册表完成 OIDC 认证换取短期凭证，并附带 provenance 防伪签名。
 
 on:
   push:
@@ -53,7 +52,6 @@ jobs:
         with:
           node-version: 24
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Ensure npm >= 11.5.1
         working-directory: .
@@ -122,14 +120,10 @@ jobs:
       - name: Publish (dry run)
         if: steps.published.outputs.exists != 'true' && ((github.event_name == 'workflow_dispatch' && inputs.dry_run) || false)
         run: npm publish --access public --tag "${{ steps.disttag.outputs.tag }}" --dry-run
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish to npm
+      - name: Publish to npm (trusted publishing)
         if: steps.published.outputs.exists != 'true' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
         run: npm publish --access public --tag "${{ steps.disttag.outputs.tag }}"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         if: github.ref_type == 'tag' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
