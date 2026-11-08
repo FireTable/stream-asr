@@ -118,7 +118,7 @@ recognizer.destroy();
 - `refined`: `{ text: string, isFinal: boolean, tokenCount: number, inferenceMs: number }`
 - `vad_state_change`: `{ state: 0 | 1 | 2, stateName: 'SILENCE' | 'SPEECH' | 'PAUSE' }`
 - `download_progress`: `{ loaded: number, total: number, percent: number }`
-- `ready`: `void`
+- `ready`: `{ threads: number, isMultiWorker: boolean } | void`
 - `error`: `Error`
 - `log`: `{ timestamp: number, level: string, tag: string, message: string }`
 
