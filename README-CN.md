@@ -1,20 +1,7 @@
 <p align="center">
-  <svg width="96" height="96" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="flame-grad-cn" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#38bdf8" />
-        <stop offset="50%" stop-color="#0284c7" />
-        <stop offset="100%" stop-color="#0369a1" />
-      </linearGradient>
-    </defs>
-    <rect width="128" height="128" rx="28" fill="#08090a" stroke="#27272a" stroke-width="2" />
-    <circle cx="64" cy="64" r="46" stroke="url(#flame-grad-cn)" stroke-width="2" stroke-dasharray="6 6" opacity="0.4" />
-    <rect x="36" y="54" width="6" height="26" rx="3" fill="url(#flame-grad-cn)" opacity="0.65" />
-    <rect x="48" y="42" width="6" height="46" rx="3" fill="url(#flame-grad-cn)" opacity="0.85" />
-    <rect x="61" y="28" width="6" height="72" rx="3" fill="url(#flame-grad-cn)" />
-    <rect x="74" y="38" width="6" height="52" rx="3" fill="url(#flame-grad-cn)" opacity="0.85" />
-    <rect x="86" y="50" width="6" height="32" rx="3" fill="url(#flame-grad-cn)" opacity="0.65" />
-  </svg>
+  <a href="https://asr.firetable.tech" target="_blank" rel="noopener noreferrer">
+    <img src="https://asr.firetable.tech/favicon.svg" width="96" height="96" alt="Stream ASR Logo" />
+  </a>
 </p>
 
 <h1 align="center">Stream ASR</h1>

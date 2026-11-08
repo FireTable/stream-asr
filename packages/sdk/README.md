@@ -1,3 +1,9 @@
+<p align="center">
+  <a href="https://asr.firetable.tech" target="_blank" rel="noopener noreferrer">
+    <img src="https://asr.firetable.tech/favicon.svg" width="80" height="80" alt="Stream ASR Logo" />
+  </a>
+</p>
+
 # @firetable/stream-asr
 
 [![npm version](https://img.shields.io/npm/v/@firetable/stream-asr?color=0284c7&logo=npm)](https://www.npmjs.com/package/@firetable/stream-asr)
