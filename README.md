@@ -55,6 +55,7 @@ Engineered from the ground up for the **LiteASR 40-layer causal Transformer spec
   - **Mode 3 (Universal Stream + VAD)**: Continuous streaming with autonomous sentence segmentation and pause detection powered by a neural VAD classifier.
 - 🌐 **Chinese & English Bilingual Transcription**: Native high-accuracy support for conversational Mandarin Chinese and English, backed by a 64,000 Byte-Level BPE vocabulary with dynamic punctuation restoration.
 - 🔄 **Built-in Lossless Audio Resampler**: Seamlessly ingests `Float32Array` PCM audio at arbitrary hardware sample rates (44.1kHz, 48kHz, etc.) and performs real-time resample conversion to 16kHz.
+- ⚡ **Multi-Worker & Single-Worker Dual Architecture**: Zero-config universal single-worker mode works everywhere without headers; optional multi-worker mode (2 to 4 threads) unlocks up to **2.4x speedup** (RTF down to ~0.22x). See the [Multi-Worker Guide](docs/MULTI_THREADING.md).
 - 🧩 **Multi-Chunk Concurrent Streaming**: Supports single binary containers (`model.bin`) or auto-assembled 20MB chunk manifests (`model.json`), completely bypassing edge CDN file-size limits.
 
 ---
@@ -279,7 +280,7 @@ Pass these options to `new StreamRecognizer(options)`:
 | `maxSegmentDurationSec` | `number` | `20` | Max continuous audio seconds before forcing punctuation cutoff. |
 | `maxTokenNum` | `number` | `256` | Maximum token generation limit per recognized segment. |
 | `maxRepeatTokens` | `number` | `15` | Maximum consecutive identical tokens before breaking repetition loop. |
-| `numThreads` | `number` | `1` | Number of MNN backend compute threads for Wasm SIMD inference. |
+| `numThreads` | `number \| 'auto'` | `'auto'` | Compute threads: `'auto'` (auto-detects `crossOriginIsolated`), `1` (single-worker), `2` or `4` (multi-worker up to 2.4x faster). See [Multi-Threading Guide](docs/MULTI_THREADING.md). |
 | `enableCache` | `boolean` | `true` | Persist model in browser IndexedDB for instant subsequent boots. |
 | `enablePostSmooth` | `boolean` | `true` | Filter speech disfluencies and normalize commas and periods. |
 | `chunks` | `string[]` | `undefined` | Optional list of chunk URLs to download concurrently and reassemble. |
@@ -296,7 +297,7 @@ Pass these options to `new StreamRecognizer(options)`:
 | `refined` | `RecognizedEvent` | Emitted when a sentence has been post-processed and smoothed by the second-pass punctuation/disfluency refiner. |
 | `vad_state_change` | `VadStateChangeEvent` | Emitted when speech activity shifts between `SILENCE` (0), `SPEECH` (1), and `PAUSE` (2). |
 | `download_progress` | `DownloadProgressEvent` | Emitted during model download with `percent`, `loaded`, `total`, and chunk counters. |
-| `ready` | `void` | Emitted when the WASM runtime has loaded the model and is ready to ingest audio. |
+| `ready` | `ReadyEvent \| void` | Emitted when the WASM runtime has loaded the model and is ready. Returns `{ threads, isMultiWorker }`. |
 | `error` | `Error` | Emitted on initialization, network, or WASM decode failures. |
 | `log` | `LogEvent` | Internal runtime logs with timestamp, level, tag, and message. |
 

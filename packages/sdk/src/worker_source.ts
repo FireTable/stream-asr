@@ -78,10 +78,11 @@ self.onmessage = async (e) => {
       const { wasmJsUrl, wasmBaseUrl, modelBuffer, config } = payload;
       if (config && config.debug !== undefined) isDebug = !!config.debug;
 
-      logDebug('INIT', 'Loading stream_asr.wasm runtime...');
+      logDebug('INIT', 'Loading WASM runtime from ' + wasmJsUrl + '...');
       const tInit0 = performance.now();
       importScripts(wasmJsUrl);
       mod = await createStreamAsrModule({
+        mainScriptUrlOrBlob: wasmJsUrl,
         locateFile: (path) => {
           if (wasmBaseUrl && path.endsWith('.wasm')) {
             const cleanBase = wasmBaseUrl.endsWith('/') ? wasmBaseUrl.slice(0, -1) : wasmBaseUrl;
@@ -93,11 +94,7 @@ self.onmessage = async (e) => {
       unpackModelBin(mod, modelBuffer, '/model');
       logDebug('INIT', 'Unpacked 18 assets from model.bin into MEMFS.');
 
-      const rc = mod.ccall('stream_asr_init', 'number', ['string'], ['/model']);
-      if (rc !== 0) {
-        throw new Error('stream_asr_init failed with code ' + rc);
-      }
-
+      // CRITICAL: Configure before init so MNN initializes RuntimeManager with requested thread count!
       if (config) {
         mod.ccall('stream_asr_load_config_json', 'number', ['string'], [JSON.stringify(config)]);
         if (config.mode) mode = config.mode;
@@ -106,10 +103,17 @@ self.onmessage = async (e) => {
         }
       }
 
-      const initMs = (performance.now() - tInit0).toFixed(1);
-      logDebug('INIT', 'WASM Core & Neural VAD ready in ' + initMs + 'ms (Mode ' + mode + ')');
+      const rc = mod.ccall('stream_asr_init', 'number', ['string'], ['/model']);
+      if (rc !== 0) {
+        throw new Error('stream_asr_init failed with code ' + rc);
+      }
 
-      self.postMessage({ type: 'READY' });
+      const threadCount = (config && (config.num_threads || config.numThreads)) ? (config.num_threads || config.numThreads) : 1;
+      const isMultiWorker = threadCount > 1;
+      const initMs = (performance.now() - tInit0).toFixed(1);
+      logDebug('INIT', 'WASM Core & Neural VAD ready in ' + initMs + 'ms (Mode ' + mode + ', ' + (isMultiWorker ? ('Multi-Worker: ' + threadCount + ' Threads') : 'Single-Worker') + ')');
+
+      self.postMessage({ type: 'READY', payload: { threads: threadCount, isMultiWorker } });
     }
     else if (type === 'CONFIG') {
       if (payload && payload.debug !== undefined) isDebug = !!payload.debug;

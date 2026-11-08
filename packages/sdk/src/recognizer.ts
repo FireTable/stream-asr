@@ -5,7 +5,8 @@ import {
   ASRMode,
   VadStateCode,
   VadStateName,
-  DownloadProgressEvent
+  DownloadProgressEvent,
+  ReadyEvent
 } from './types.js';
 import { WORKER_SCRIPT } from './worker_source.js';
 import { getCachedModel, setCachedModel, isValidModelBuffer } from './idb_cache.js';
@@ -48,6 +49,7 @@ export class StreamRecognizer {
   private resampler: AudioResampler | null = null;
   private listeners: Map<keyof EventMap, Set<Function>> = new Map();
   private initialized: boolean = false;
+  private activeThreads: number = 1;
   private lastVadState: number = -1;
   private latestProgress: DownloadProgressEvent | null = null;
 
@@ -57,6 +59,7 @@ export class StreamRecognizer {
       wasmBaseUrl: '/wasm',
       modelVersion: '1.0.0',
       mode: 3,
+      numThreads: 'auto',
       debug: true,
       sampleRate: 16000,
       maxTokenNum: 256,
@@ -65,6 +68,27 @@ export class StreamRecognizer {
       enablePostSmooth: true,
       ...options
     };
+  }
+
+  /**
+   * Number of active inference compute threads / workers.
+   */
+  public get threads(): number {
+    return this.activeThreads;
+  }
+
+  /**
+   * Whether multi-worker parallel execution is currently active.
+   */
+  public get isMultiWorker(): boolean {
+    return this.activeThreads > 1;
+  }
+
+  /**
+   * Utility helper to check if the current browser environment supports multi-worker threading (SharedArrayBuffer).
+   */
+  public static isMultiWorkerSupported(): boolean {
+    return typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
   }
 
   /**
@@ -163,7 +187,43 @@ export class StreamRecognizer {
     } else {
       wasmBaseUrl = rawBase;
     }
-    const wasmJsUrl = `${wasmBaseUrl}/stream_asr.js`;
+
+    // Determine thread count and target WASM variant
+    const envSupportsThreads = StreamRecognizer.isMultiWorkerSupported();
+    let requestedThreads = this.options.numThreads ?? 'auto';
+    let actualThreads = 1;
+    let useThreadedWasm = false;
+
+    if (requestedThreads === 'auto') {
+      if (envSupportsThreads) {
+        const hwCores = typeof navigator !== 'undefined' && navigator.hardwareConcurrency ? navigator.hardwareConcurrency : 4;
+        actualThreads = Math.min(4, Math.max(1, hwCores >= 4 ? 4 : 2));
+        useThreadedWasm = actualThreads > 1;
+      } else {
+        actualThreads = 1;
+        useThreadedWasm = false;
+      }
+    } else if (typeof requestedThreads === 'number' && requestedThreads > 1) {
+      if (envSupportsThreads) {
+        actualThreads = Math.min(16, Math.max(1, requestedThreads));
+        useThreadedWasm = true;
+      } else {
+        if (this.options.debug) {
+          console.warn(
+            `[StreamRecognizer] Multi-worker threading (numThreads = ${requestedThreads}) requires cross-origin isolation (COOP & COEP HTTP headers). ` +
+            `Falling back to single-worker mode (1 thread).`
+          );
+        }
+        actualThreads = 1;
+        useThreadedWasm = false;
+      }
+    } else {
+      actualThreads = 1;
+      useThreadedWasm = false;
+    }
+
+    this.activeThreads = actualThreads;
+    const wasmJsUrl = useThreadedWasm ? `${wasmBaseUrl}/stream_asr.threaded.js` : `${wasmBaseUrl}/stream_asr.js`;
 
     // Composite cache key incorporating version and model source
     let cacheKey = this.options.modelVersion ? `v${this.options.modelVersion}` : 'v1.0.0';
@@ -397,8 +457,11 @@ export class StreamRecognizer {
         const { type, payload, error } = e.data;
         if (type === 'READY') {
           cleanupHandlers();
+          if (payload && typeof payload.threads === 'number') {
+            this.activeThreads = payload.threads;
+          }
           this.initialized = true;
-          this.emit('ready', undefined as unknown as void);
+          this.emit('ready', { threads: this.activeThreads, isMultiWorker: this.activeThreads > 1 });
           resolve();
         } else if (type === 'ERROR') {
           cleanupHandlers();
@@ -436,7 +499,7 @@ export class StreamRecognizer {
           config: {
             mode: numericMode,
             debug: this.options.debug ?? true,
-            num_threads: this.options.numThreads ?? 1,
+            num_threads: actualThreads,
             audio: {
               sample_rate: this.options.sampleRate ?? 16000,
               chunk_size: 1600,

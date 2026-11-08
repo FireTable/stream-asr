@@ -159,6 +159,7 @@ export const translations = {
       emptyHint: "Click \"Click to Speak\" or \"Test Sample\" to view real-time execution details",
       footerNative: "Supports browser DevTools color output",
       footerMode: "Mode 3 (Universal Streaming)",
+      jumpToBottom: "Jump to Bottom",
     }
   },
   'zh-cn': {
@@ -301,6 +302,7 @@ export const translations = {
       emptyHint: "点击「说话」或「试听样本」即可查看实时执行细节",
       footerNative: "支持浏览器 F12 控制台彩色原生输出",
       footerMode: "Mode 3 (通用流式识别 + VAD)",
+      jumpToBottom: "回到底部",
     }
   },
   'zh-hk': {
@@ -443,6 +445,7 @@ export const translations = {
       emptyHint: "點擊「說話」或「試聽樣本」即可查看實時執行細節",
       footerNative: "支援瀏覽器 F12 控制台彩色原生輸出",
       footerMode: "Mode 3 (通用串流識別 + VAD)",
+      jumpToBottom: "回到底部",
     }
   }
 };

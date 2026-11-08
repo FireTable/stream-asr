@@ -112,10 +112,15 @@ export interface StreamRecognizerOptions {
   maxRepeatTokens?: number;
 
   /**
-   * Number of MNN backend compute threads for WebAssembly SIMD inference.
-   * @default 1
+   * Number of MNN backend compute threads / workers for WebAssembly SIMD inference.
+   * - `'auto'`: Automatically detects `crossOriginIsolated` (SharedArrayBuffer) support.
+   *   If supported, scales up to multi-worker (2 to 4 threads); otherwise seamlessly falls back to 1 thread.
+   * - `1`: Single-worker mode (universal compatibility mode, works in any standard browser environment without COOP/COEP headers).
+   * - `2` | `4` | `number`: Explicit thread count. If the host environment does not support SharedArrayBuffer
+   *   (missing COOP/COEP headers), logs a friendly warning and gracefully falls back to single-worker (1 thread).
+   * @default 'auto'
    */
-  numThreads?: number;
+  numThreads?: number | 'auto';
 
   /**
    * Enable IndexedDB offline persistent caching for `model.bin`.
@@ -249,6 +254,21 @@ export interface DownloadProgressEvent {
 }
 
 /**
+ * Event emitted when the WebAssembly core and acoustic model are fully initialized and ready.
+ */
+export interface ReadyEvent {
+  /**
+   * Number of compute threads / workers allocated for WASM inference.
+   */
+  threads: number;
+
+  /**
+   * Whether multi-worker parallel execution is currently active.
+   */
+  isMultiWorker: boolean;
+}
+
+/**
  * Complete type map of all events supported by StreamRecognizer.
  */
 export type EventMap = {
@@ -258,7 +278,7 @@ export type EventMap = {
   vad_state_change: VadStateChangeEvent;
   download_progress: DownloadProgressEvent;
   log: LogEvent;
-  ready: void;
+  ready: ReadyEvent | void;
   error: Error;
 };
 

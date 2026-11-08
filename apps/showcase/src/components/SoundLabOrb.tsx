@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './SoundLabOrb.css';
 
 const VERTEX_SHADER = `#version 300 es
@@ -225,69 +225,23 @@ export default function SoundLabOrb({
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
 
+  const [isGlReady, setIsGlReady] = useState(false);
+  const isGlReadyRef = useRef(false);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const gl = canvas.getContext('webgl2', {
-      alpha: true,
-      premultipliedAlpha: true,
-      antialias: false,
-      powerPreference: 'low-power'
-    });
-    if (!gl) return;
+    let isRunning = true;
+    let animId = 0;
+    let isInitialized = false;
 
-    // Gracefully handle WebGL context loss to prevent Chrome GPU crashes
-    const handleContextLost = (e: Event) => {
-      e.preventDefault();
-      cancelAnimationFrame(animId);
-      animId = 0;
-    };
-    canvas.addEventListener('webglcontextlost', handleContextLost, false);
-
-    // Compile shaders
-    const vs = gl.createShader(gl.VERTEX_SHADER)!;
-    gl.shaderSource(vs, VERTEX_SHADER);
-    gl.compileShader(vs);
-
-    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
-    gl.shaderSource(fs, FRAGMENT_SHADER);
-    gl.compileShader(fs);
-
-    const program = gl.createProgram()!;
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.bindAttribLocation(program, 0, 'position');
-    gl.linkProgram(program);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('[SoundLabOrb] Shader link failed:', gl.getProgramInfoLog(program));
-      return;
-    }
-
-    const vaoBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vaoBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.useProgram(program);
-
-    const u = Object.fromEntries(
-      [
-        'uResolution',
-        'uTime',
-        'uFlow',
-        'uTurn',
-        'uEnergy',
-        'uPulse',
-        'uBands',
-        'uLight',
-        'uInk',
-        'uTint',
-        'uIntro',
-        'uHover'
-      ].map(name => [name, gl.getUniformLocation(program, name)!])
-    );
+    let gl: WebGL2RenderingContext | null = null;
+    let program: WebGLProgram | null = null;
+    let vs: WebGLShader | null = null;
+    let fs: WebGLShader | null = null;
+    let vaoBuffer: WebGLBuffer | null = null;
+    let u: Record<string, WebGLUniformLocation | null> = {};
 
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
     // Cap DPR to 1.5 for silky smooth 60/120fps raymarching while slashing pixel fillrate overhead by 44%
@@ -313,9 +267,8 @@ export default function SoundLabOrb({
       calm: 0
     };
 
-    let animId = 0;
-
     const updateSize = () => {
+      if (!canvas || !gl || gl.isContextLost()) return;
       const dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
       const w = Math.max(1, Math.round((canvas.clientWidth || 320) * dpr));
       const h = Math.max(1, Math.round((canvas.clientHeight || 320) * dpr));
@@ -326,9 +279,108 @@ export default function SoundLabOrb({
       }
     };
 
+    const stopLoop = () => {
+      if (animId) {
+        cancelAnimationFrame(animId);
+        animId = 0;
+      }
+    };
+
+    const startLoopIfReady = () => {
+      if (!animId && isRunning && state.visible && !document.hidden && isInitialized) {
+        state.last = performance.now();
+        animId = requestAnimationFrame(render);
+      }
+    };
+
+    const initWebGL = () => {
+      if (!canvas || !isRunning) return;
+      try {
+        if (!gl || gl.isContextLost()) {
+          gl = canvas.getContext('webgl2', {
+            alpha: true,
+            premultipliedAlpha: true,
+            antialias: false,
+            powerPreference: 'low-power'
+          });
+        }
+        if (!gl || gl.isContextLost()) return;
+
+        // Compile vertex shader
+        vs = gl.createShader(gl.VERTEX_SHADER);
+        if (!vs) return;
+        gl.shaderSource(vs, VERTEX_SHADER);
+        gl.compileShader(vs);
+        if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS)) {
+          console.warn('[SoundLabOrb] Vertex shader compile failed:', gl.getShaderInfoLog(vs));
+          return;
+        }
+
+        // Compile fragment shader
+        fs = gl.createShader(gl.FRAGMENT_SHADER);
+        if (!fs) return;
+        gl.shaderSource(fs, FRAGMENT_SHADER);
+        gl.compileShader(fs);
+        if (!gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+          console.warn('[SoundLabOrb] Fragment shader compile failed:', gl.getShaderInfoLog(fs));
+          return;
+        }
+
+        program = gl.createProgram();
+        if (!program) return;
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+        gl.bindAttribLocation(program, 0, 'position');
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          console.warn('[SoundLabOrb] Shader link failed:', gl.getProgramInfoLog(program));
+          return;
+        }
+
+        vaoBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vaoBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.useProgram(program);
+
+        const uniformNames = [
+          'uResolution',
+          'uTime',
+          'uFlow',
+          'uTurn',
+          'uEnergy',
+          'uPulse',
+          'uBands',
+          'uLight',
+          'uInk',
+          'uTint',
+          'uIntro',
+          'uHover'
+        ];
+        u = Object.fromEntries(
+          uniformNames.map(name => [name, gl!.getUniformLocation(program!, name)])
+        );
+
+        isInitialized = true;
+        updateSize();
+        startLoopIfReady();
+      } catch (err) {
+        console.warn('[SoundLabOrb] WebGL initialization error:', err);
+      }
+    };
+
     const render = (now: number) => {
       animId = 0;
-      if (!state.visible || document.hidden) return;
+      if (!isRunning || !state.visible || document.hidden) return;
+      if (!gl || gl.isContextLost() || !program || !isInitialized) {
+        if (isGlReadyRef.current) {
+          isGlReadyRef.current = false;
+          setIsGlReady(false);
+        }
+        return;
+      }
 
       // Maintain smooth frame pacing without judder across 60Hz and 120Hz/ProMotion displays
       const rawDt = (now - state.last) / 1000;
@@ -379,88 +431,154 @@ export default function SoundLabOrb({
         state.turn[i] += dt * EE.turn[i] * speedFactor;
       }
 
-      gl.clearColor(0, 0, 0, 0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      try {
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
 
-      const themeKey = state.light ? 'light' : 'dark';
+        const themeKey = state.light ? 'light' : 'dark';
 
-      // Interpolate between FireTable pearl silk and electric cyan when voice/audio is active
-      const activeWeight = Math.min(1.0, Math.max(0.0, state.activeTransition));
-      const basePal = PALETTES.default[themeKey];
-      const cyanPal = PALETTES.active[themeKey];
+        // Interpolate between FireTable pearl silk and electric cyan when voice/audio is active
+        const activeWeight = Math.min(1.0, Math.max(0.0, state.activeTransition));
+        const basePal = PALETTES.default[themeKey];
+        const cyanPal = PALETTES.active[themeKey];
 
-      const ink = [
-        basePal.ink[0] * (1 - activeWeight) + cyanPal.ink[0] * activeWeight,
-        basePal.ink[1] * (1 - activeWeight) + cyanPal.ink[1] * activeWeight,
-        basePal.ink[2] * (1 - activeWeight) + cyanPal.ink[2] * activeWeight,
-      ];
-      const tint = [
-        basePal.tint[0] * (1 - activeWeight) + cyanPal.tint[0] * activeWeight,
-        basePal.tint[1] * (1 - activeWeight) + cyanPal.tint[1] * activeWeight,
-        basePal.tint[2] * (1 - activeWeight) + cyanPal.tint[2] * activeWeight,
-      ];
+        const ink = [
+          basePal.ink[0] * (1 - activeWeight) + cyanPal.ink[0] * activeWeight,
+          basePal.ink[1] * (1 - activeWeight) + cyanPal.ink[1] * activeWeight,
+          basePal.ink[2] * (1 - activeWeight) + cyanPal.ink[2] * activeWeight,
+        ];
+        const tint = [
+          basePal.tint[0] * (1 - activeWeight) + cyanPal.tint[0] * activeWeight,
+          basePal.tint[1] * (1 - activeWeight) + cyanPal.tint[1] * activeWeight,
+          basePal.tint[2] * (1 - activeWeight) + cyanPal.tint[2] * activeWeight,
+        ];
 
-      gl.uniform2f(u.uResolution, canvas.width, canvas.height);
-      gl.uniform1f(u.uTime, prefersReducedMotion ? 0 : elapsed);
-      gl.uniform3f(u.uFlow, state.flow[0], state.flow[1], state.flow[2]);
-      gl.uniform3f(u.uTurn, state.turn[0], state.turn[1], state.turn[2]);
-      gl.uniform1f(u.uEnergy, prefersReducedMotion ? state.shown * 0.5 : state.shown);
-      gl.uniform1f(u.uPulse, prefersReducedMotion ? 0 : state.pulse);
-      gl.uniform3f(u.uBands, state.bands[0], state.bands[1], state.bands[2]);
-      gl.uniform1f(u.uLight, state.light ? 1 : 0);
-      gl.uniform3f(u.uInk, ink[0], ink[1], ink[2]);
-      gl.uniform3f(u.uTint, tint[0], tint[1], tint[2]);
-      gl.uniform1f(u.uIntro, Math.min(1, elapsed / 1.1));
-      gl.uniform1f(u.uHover, state.hover);
+        gl.useProgram(program);
+        if (u.uResolution) gl.uniform2f(u.uResolution, canvas.width, canvas.height);
+        if (u.uTime) gl.uniform1f(u.uTime, prefersReducedMotion ? 0 : elapsed);
+        if (u.uFlow) gl.uniform3f(u.uFlow, state.flow[0], state.flow[1], state.flow[2]);
+        if (u.uTurn) gl.uniform3f(u.uTurn, state.turn[0], state.turn[1], state.turn[2]);
+        if (u.uEnergy) gl.uniform1f(u.uEnergy, prefersReducedMotion ? state.shown * 0.5 : state.shown);
+        if (u.uPulse) gl.uniform1f(u.uPulse, prefersReducedMotion ? 0 : state.pulse);
+        if (u.uBands) gl.uniform3f(u.uBands, state.bands[0], state.bands[1], state.bands[2]);
+        if (u.uLight) gl.uniform1f(u.uLight, state.light ? 1 : 0);
+        if (u.uInk) gl.uniform3f(u.uInk, ink[0], ink[1], ink[2]);
+        if (u.uTint) gl.uniform3f(u.uTint, tint[0], tint[1], tint[2]);
+        if (u.uIntro) gl.uniform1f(u.uIntro, Math.min(1, elapsed / 1.1));
+        if (u.uHover) gl.uniform1f(u.uHover, state.hover);
 
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      animId = requestAnimationFrame(render);
-    };
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    const wake = () => {
-      if (!animId && state.visible && !document.hidden) {
-        state.last = performance.now();
+        if (!isGlReadyRef.current) {
+          isGlReadyRef.current = true;
+          setIsGlReady(true);
+        }
+      } catch (err) {
+        console.warn('[SoundLabOrb] Render frame error:', err);
+      }
+
+      if (isRunning && state.visible && !document.hidden) {
         animId = requestAnimationFrame(render);
       }
     };
 
+    // WebGL 上下文丢失 (手机切后台 / 电脑休眠 / GPU 内存回收):
+    // 关键: preventDefault 告诉浏览器将恢复上下文, 否则直接永久抛弃!
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      stopLoop();
+      isInitialized = false;
+      isGlReadyRef.current = false;
+      setIsGlReady(false);
+    };
+
+    // WebGL 上下文恢复 (切回前台 / GPU 资源重组):
+    // 重置所有 GL 资源指针并全量重新编译 Shader 与绑定 Buffer
+    const handleContextRestored = () => {
+      if (!isRunning) return;
+      program = null;
+      vs = null;
+      fs = null;
+      vaoBuffer = null;
+      u = {};
+      isInitialized = false;
+      state.last = performance.now();
+      state.start = performance.now();
+      if (state.visible && !document.hidden) {
+        initWebGL();
+      }
+    };
+
+    canvas.addEventListener('webglcontextlost', handleContextLost, false);
+    canvas.addEventListener('webglcontextrestored', handleContextRestored, false);
+
+    // 页面能见度与后台调度 (手机切后台立即取消 RAF, 切回前台安全恢复)
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopLoop();
+        return;
+      }
+      state.last = performance.now();
+      if (!gl || gl.isContextLost()) {
+        isGlReadyRef.current = false;
+        setIsGlReady(false);
+        return;
+      }
+      if (!isInitialized) {
+        initWebGL();
+      } else {
+        startLoopIfReady();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // bfcache 恢复 (pageshow persisted)
+    window.addEventListener('pageshow', handleVisibilityChange);
+
     const io = new IntersectionObserver(entries => {
       state.visible = entries.some(e => e.isIntersecting);
-      wake();
+      if (state.visible) {
+        startLoopIfReady();
+      } else {
+        stopLoop();
+      }
     });
     io.observe(canvas);
 
     const ro = new ResizeObserver(() => {
       updateSize();
-      wake();
+      startLoopIfReady();
     });
     ro.observe(canvas);
-    updateSize();
 
     const mo = new MutationObserver(() => {
       state.light = isLightTheme();
-      wake();
+      startLoopIfReady();
     });
     mo.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class', 'data-theme']
     });
 
-    document.addEventListener('visibilitychange', wake);
-    wake();
+    // 初始启动 WebGL 初始化
+    initWebGL();
 
     return () => {
-      cancelAnimationFrame(animId);
+      isRunning = false;
+      stopLoop();
       io.disconnect();
       ro.disconnect();
       mo.disconnect();
-      document.removeEventListener('visibilitychange', wake);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pageshow', handleVisibilityChange);
       canvas.removeEventListener('webglcontextlost', handleContextLost);
-      gl.deleteBuffer(vaoBuffer);
-      gl.deleteProgram(program);
-      gl.deleteShader(vs);
-      gl.deleteShader(fs);
-      // Keep WebGL context alive across React re-mounts
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored);
+      if (gl && !gl.isContextLost()) {
+        if (vaoBuffer) gl.deleteBuffer(vaoBuffer);
+        if (program) gl.deleteProgram(program);
+        if (vs) gl.deleteShader(vs);
+        if (fs) gl.deleteShader(fs);
+      }
     };
   }, []);
 
@@ -477,7 +595,23 @@ export default function SoundLabOrb({
       }}
       aria-label="Sound Lab Acoustic Sphere"
     >
-      <canvas ref={canvasRef} className="snd-orb-canvas" aria-hidden="true" />
+      {/* Aesthetic fallback sphere: guarantees beautiful aesthetics even during WebGL compile/restore & prevents white box */}
+      <div
+        className={`snd-orb-fallback absolute inset-0 rounded-full transition-opacity duration-500 pointer-events-none ${
+          isGlReady ? 'opacity-0' : 'opacity-100'
+        }`}
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 rounded-full border border-sky-400/25 dark:border-sky-400/20 shadow-[inset_0_0_24px_rgba(56,189,248,0.18)]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-1/3 bg-gradient-to-r from-transparent via-sky-300/20 dark:via-sky-200/25 to-transparent blur-md rounded-full" />
+      </div>
+      <canvas
+        ref={canvasRef}
+        className={`snd-orb-canvas absolute inset-0 w-full h-full block rounded-full transition-opacity duration-300 pointer-events-none ${
+          isGlReady ? 'opacity-100' : 'opacity-0'
+        }`}
+        aria-hidden="true"
+      />
     </button>
   );
 }

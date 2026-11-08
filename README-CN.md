@@ -55,6 +55,7 @@
   - **模式 3（通用长流式 + 神经 VAD）**：内置独立深度学习 VAD 状态机，智能探测换气与自然停顿，自动加标点与句子截断。
 - 🌐 **中文（普通话）与英文高质量识别**：原生支持中文普通话与英文高准确率转写，内置 64k Byte BPE 词表与自适应动态加标点。
 - 🔄 **内置无损音频重采样器**：支持任意硬件采样率（44.1kHz、48kHz 等）的 `Float32Array` PCM 音频输入，运行时无感毫秒级重采样至 16kHz。
+- ⚡ **单 Worker / 多 Worker 双架构支持**：零配置单 Worker 模式免配任何 HTTP 头开箱即用；开启跨域隔离时自动激活多 Worker 线程池（2~4 线程），推理速度最高再提升 **2.4 倍**（RTF 降至 ~0.22x）。详见 [多 Worker 运行指南](docs/MULTI_THREADING.md)。
 - 🧩 **支持并发分片下载架构**：支持单一二进制包体（`model.bin`）或切片清单（`model.json` + `<=20MB` 分片），完美适配 Cloudflare Pages 等无服务器静态 CDN 限制。
 
 ---
@@ -272,7 +273,7 @@ async function startMicrophoneASR() {
 | `maxSegmentDurationSec` | `number` | `20` | 单句最大持续秒数，超时强制标点截断。 |
 | `maxTokenNum` | `number` | `256` | 每个识别片段的最大生成 token 数量限制。 |
 | `maxRepeatTokens` | `number` | `15` | 连续相同 token 循环截断阈值。 |
-| `numThreads` | `number` | `1` | MNN 后端多线程推理线程数（默认 1，WASM 单线程最佳）。 |
+| `numThreads` | `number \| 'auto'` | `'auto'` | 推理线程数：`'auto'`（自动探测跨域隔离环境）、`1`（单 Worker 兼容模式）、`2` 或 `4`（多 Worker 提速最高 2.4 倍）。详见 [多 Worker 指南](docs/MULTI_THREADING.md)。 |
 | `enableCache` | `boolean` | `true` | 是否在浏览器 IndexedDB 中持久化缓存模型。 |
 | `enablePostSmooth` | `boolean` | `true` | 是否启用语气词过滤与逗号句号标点生成。 |
 | `chunks` | `string[]` | `undefined` | 显式分片下载 URL 数组，并发拉取并在内存组装。 |
@@ -289,7 +290,7 @@ async function startMicrophoneASR() {
 | `refined` | `RecognizedEvent` | 二次平滑标点过滤完成时触发，提供精炼后的文本。 |
 | `vad_state_change` | `VadStateChangeEvent` | VAD 状态在 `SILENCE` (0)、`SPEECH` (1)、`PAUSE` (2) 之间切换时触发。 |
 | `download_progress` | `DownloadProgressEvent` | 模型拉取过程中触发，包含下载百分比、已下载字节数与分片计数。 |
-| `ready` | `void` | WASM 引擎加载模型完毕，随时可以接收音频数据时触发。 |
+| `ready` | `ReadyEvent \| void` | WASM 引擎与声学模型加载就绪时触发，返回 `{ threads, isMultiWorker }`。 |
 | `error` | `Error` | 引擎初始化、网络加载或解码异常时触发。 |
 | `log` | `LogEvent` | 引擎内部日志，包含时间戳、日志等级、标签与消息。 |
 

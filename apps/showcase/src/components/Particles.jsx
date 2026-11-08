@@ -652,6 +652,7 @@ const Particles = ({
     };
 
     const render = () => {
+      if (!gl || gl.isContextLost()) return;
       const s = settingsRef.current;
       rebuild(s);
       const matrix = rotationOf(s);
@@ -827,9 +828,26 @@ const Particles = ({
     };
 
     const onVisibility = () => {
+      if (document.hidden) {
+        if (raf) {
+          cancelAnimationFrame(raf);
+          raf = 0;
+        }
+        return;
+      }
+      if (gl?.isContextLost()) return;
       last = 0;
       wake();
     };
+
+    const handleContextLost = e => {
+      e.preventDefault();
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+    canvas.addEventListener('webglcontextlost', handleContextLost, false);
 
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(container);
@@ -848,6 +866,7 @@ const Particles = ({
     window.addEventListener('pointercancel', onPointerUp, { passive: true });
     document.documentElement.addEventListener('pointerleave', onPointerLeave);
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pageshow', onVisibility);
     resize();
 
     let lastDpr = settingsRef.current.dpr;
@@ -863,7 +882,7 @@ const Particles = ({
     };
 
     return () => {
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
       wakeRef.current = null;
       resizeObserver.disconnect();
       intersection.disconnect();
@@ -873,11 +892,15 @@ const Particles = ({
       window.removeEventListener('pointercancel', onPointerUp);
       document.documentElement.removeEventListener('pointerleave', onPointerLeave);
       document.removeEventListener('visibilitychange', onVisibility);
-      gl.deleteProgram(dots.program);
-      gl.deleteProgram(lines.program);
-      [corners, positionBuffer, randomBuffer, colorBuffer, lineBuffer].forEach(buffer => gl.deleteBuffer(buffer));
-      gl.deleteVertexArray(dotVao);
-      gl.deleteVertexArray(lineVao);
+      window.removeEventListener('pageshow', onVisibility);
+      canvas.removeEventListener('webglcontextlost', handleContextLost);
+      if (gl && !gl.isContextLost()) {
+        gl.deleteProgram(dots.program);
+        gl.deleteProgram(lines.program);
+        [corners, positionBuffer, randomBuffer, colorBuffer, lineBuffer].forEach(buffer => gl.deleteBuffer(buffer));
+        gl.deleteVertexArray(dotVao);
+        gl.deleteVertexArray(lineVao);
+      }
       // NOTE: Do not call loseContext() to preserve WebGL context across re-mounts
     };
   }, []);

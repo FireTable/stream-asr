@@ -176,12 +176,67 @@ async function main() {
 
   console.log('\n========================================');
   if (passed) {
-    console.log('✅ ALL 4 MODES PASSED WITH 100% TOKEN PARITY!');
+    console.log('✅ ALL 4 SINGLE-THREAD MODES PASSED WITH 100% TOKEN PARITY!');
   } else {
     console.error('❌ Mismatch detected against expected text!');
     process.exit(1);
   }
   console.log('========================================');
+
+  // -------------------------------------------------------------
+  // Test Multi-Threaded WASM (if available)
+  // -------------------------------------------------------------
+  const threadedJsPath = path.join(__dirname, '../packages/core/dist/stream_asr.threaded.js');
+  if (fs.existsSync(threadedJsPath)) {
+    console.log('\n\n=== Testing Multi-Threaded WASM Runtime (Pthreads) ===');
+    const createThreadedModule = require(threadedJsPath);
+
+    for (const numThreads of [2, 4]) {
+      console.log(`\n--- Testing Multi-Worker with ${numThreads} Threads ---`);
+      const tThr0 = performance.now();
+      const thrMod = await createThreadedModule();
+      unpackModelBin(thrMod, MODEL_BIN_PATH, '/model');
+
+      thrMod.ccall('stream_asr_load_config_json', 'number', ['string'], [JSON.stringify({
+        mode: 3,
+        num_threads: numThreads
+      })]);
+
+      const thrRc = thrMod.ccall('stream_asr_init', 'number', ['string'], ['/model']);
+      if (thrRc !== 0) {
+        throw new Error(`stream_asr_init (threaded ${numThreads}) failed with code ${thrRc}`);
+      }
+      console.log(`[Threaded ${numThreads}T] init in ${(performance.now() - tThr0).toFixed(1)}ms`);
+
+      const thrSPtr = thrMod._malloc(floatSamples.length * 4);
+      thrMod.HEAPF32.set(floatSamples, thrSPtr >> 2);
+
+      thrMod._stream_asr_reset_universal_stream();
+      const tInfer0 = performance.now();
+      let thrText = '';
+      for (let off = 0; off < floatSamples.length; off += chunkSize) {
+        const n = Math.min(chunkSize, floatSamples.length - off);
+        const isFinal = off + n >= floatSamples.length ? 1 : 0;
+        const strPtr = thrMod._stream_asr_accept_waveform_universal(thrSPtr + off * 4, n, isFinal);
+        thrText = thrMod.UTF8ToString(strPtr);
+      }
+      const thrInferMs = performance.now() - tInfer0;
+      const speedup = (univWall / thrInferMs).toFixed(2);
+      console.log(`[Threaded ${numThreads}T] Text: "${thrText}"`);
+      console.log(`[Threaded ${numThreads}T] Wall: ${thrInferMs.toFixed(1)}ms, RTF: ${(thrInferMs / (audioSec * 1000)).toFixed(3)} (${speedup}x speedup vs 1T)`);
+
+      thrMod._free(thrSPtr);
+
+      if (thrText !== EXPECTED) {
+        console.error(`❌ Threaded ${numThreads}T text mismatch!`);
+        process.exit(1);
+      }
+      console.log(`✅ [Threaded ${numThreads}T] 100% EXACT TOKEN MATCH!`);
+    }
+    console.log('\n========================================');
+    console.log('🎉 ALL SINGLE-WORKER & MULTI-WORKER TESTS PASSED!');
+    console.log('========================================');
+  }
 }
 
 main().catch((err) => {
