@@ -79,7 +79,7 @@
 2. 初始化 StreamRecognizer 实例（采用 Mode 3 通用流式模式，启用神经网络 VAD）
 3. 接入麦克风音频流并监听 recognizing / recognized 实时文本回调
 
-参考官方文档与示例：https://github.com/firetable/stream-asr#readme
+参考官方文档与示例：https://github.com/FireTable/stream-asr#readme
 ```
 
 ### 机器可读文档直链
@@ -98,11 +98,13 @@ stream-asr/
 │   │   └── src/                     # 声学前端 (FBank, CMVN), VAD 状态机与 BPE 解码器
 │   └── sdk/                         # 浏览器端 TypeScript SDK (@firetable/stream-asr)
 │       ├── src/
+│       │   ├── index.ts             # SDK 公开入口与类重导出
 │       │   ├── recognizer.ts        # 主 StreamRecognizer 控制器与公开 API
-│       │   ├── worker.ts            # 隔离的 Web Worker 多线程管道
+│       │   ├── worker_source.ts     # 内联 Web Worker 脚本与张量推理调度
 │       │   ├── resampler.ts         # 高精度线性音频重采样器 (任意采样率转 16kHz)
-│       │   ├── idb-cache.ts         # IndexedDB 离线持久化缓存引擎
+│       │   ├── idb_cache.ts         # IndexedDB 离线持久化缓存引擎
 │       │   └── types.ts             # 完整 TypeScript 类型定义与 EventMap
+│       ├── wasm/                    # SDK 打包内置的 stream_asr.wasm 与 stream_asr.js
 │       ├── package.json
 │       └── tsconfig.json
 ├── apps/
@@ -255,19 +257,69 @@ async function startMicrophoneASR() {
 | 选项名称 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `modelUrl` | `string` | `'/model.bin'` | 模型容器二进制文件路径或切片清单（`model.json`）。 |
+| `modelVersion` | `string` | `'1.0.0'` | 模型版本标识，更新此值会自动失效旧缓存并拉取新模型。 |
 | `wasmBaseUrl` | `string` | `'/wasm'` | 托管 `stream_asr.wasm` 与 `stream_asr.js` 的目录路径。 |
 | `mode` | `ASRMode` | `3` | `1`（短句极速流式）或 `3`（通用长流式 + 神经 VAD 断句）。 |
-| `sampleRate` | `number` | `16000` | 目标识别采样率（单位 Hz）。 |
+| `sampleRate` | `number` | `16000` | 目标识别采样率（单位 Hz，音频若为其他采样率将自动重采样）。 |
 | `vadThreshold` | `number` | `0.5` | 神经网络静音检测激活灵敏度（0.0 ~ 1.0）。 |
 | `speechPauseThreshold` | `number` | `0.925` | 停顿窗口中静音帧占比触发断句的阈值。 |
 | `minSpeechDurationMs` | `number` | `480` | 触发人声开始所需的最小毫秒数。 |
 | `maxPauseDurationMs` | `number` | `2080` | 判定为停顿断句所需的静音毫秒数。 |
 | `maxSegmentDurationSec` | `number` | `20` | 单句最大持续秒数，超时强制标点截断。 |
+| `maxTokenNum` | `number` | `256` | 每个识别片段的最大生成 token 数量限制。 |
+| `maxRepeatTokens` | `number` | `15` | 连续相同 token 循环截断阈值。 |
+| `numThreads` | `number` | `1` | MNN 后端多线程推理线程数（默认 1，WASM 单线程最佳）。 |
 | `enableCache` | `boolean` | `true` | 是否在浏览器 IndexedDB 中持久化缓存模型。 |
-| `modelVersion` | `string` | `'1.0.0'` | 模型版本标识，更新此值会自动失效旧缓存并拉取新模型。 |
 | `enablePostSmooth` | `boolean` | `true` | 是否启用语气词过滤与逗号句号标点生成。 |
 | `chunks` | `string[]` | `undefined` | 显式分片下载 URL 数组，并发拉取并在内存组装。 |
 | `debug` | `boolean` | `true` | 是否在控制台打印详细调试日志。 |
+
+---
+
+### 事件订阅 (`recognizer.on(event, handler)`)
+
+| 事件名称 | 回调参数接口 | 说明 |
+| :--- | :--- | :--- |
+| `recognizing` | `RecognizingEvent` | 说话流式进行中持续触发，包含当前上屏文本与 VAD 状态。 |
+| `recognized` | `RecognizedEvent` | 句子停顿或自然结句时触发，包含整句归档文本、token 计数与耗时。 |
+| `refined` | `RecognizedEvent` | 二次平滑标点过滤完成时触发，提供精炼后的文本。 |
+| `vad_state_change` | `VadStateChangeEvent` | VAD 状态在 `SILENCE` (0)、`SPEECH` (1)、`PAUSE` (2) 之间切换时触发。 |
+| `download_progress` | `DownloadProgressEvent` | 模型拉取过程中触发，包含下载百分比、已下载字节数与分片计数。 |
+| `ready` | `void` | WASM 引擎加载模型完毕，随时可以接收音频数据时触发。 |
+| `error` | `Error` | 引擎初始化、网络加载或解码异常时触发。 |
+| `log` | `LogEvent` | 引擎内部日志，包含时间戳、日志等级、标签与消息。 |
+
+---
+
+### 核心方法与属性
+
+| 成员 | 类型 / 签名 | 说明 |
+| :--- | :--- | :--- |
+| `init()` | `() => Promise<void>` | 编译 WASM、拉起 Worker 线程、从网络或 IndexedDB 加载模型并就绪。 |
+| `feed()` | `(inputPcm: Float32Array, inputSampleRate?: number, isFinal?: boolean) => void` | 向流式引擎追加音频采样帧，非 16kHz 自动执行线性重采样。 |
+| `finish()` | `() => void` | 结束当前拾音流，排空所有残留音频帧并终结活跃句子。 |
+| `reset()` | `() => void` | 重置声学状态与 KV-Cache，不重新加载模型即可开启新会话。 |
+| `destroy()` | `() => void` | 销毁 Web Worker 实例并释放所有 WebAssembly 线性内存。 |
+| `setConfig()` | `(config: Partial<StreamRecognizerOptions>) => void` | 运行时动态热更新参数（如 `mode`、`vadThreshold`、`debug`），无需重载模型。 |
+| `on()` | `(event: K, listener: Listener<EventMap[K]>) => this` | 注册事件监听器。 |
+| `once()` | `(event: K, listener: Listener<EventMap[K]>) => this` | 注册单次触发事件监听器。 |
+| `off()` | `(event: K, listener: Listener<EventMap[K]>) => this` | 注销事件监听器。 |
+| `isReady` | `boolean (getter)` | 属性，返回引擎是否已完成初始化并就绪。 |
+| `downloadProgress` | `DownloadProgressEvent \| null (getter)` | 属性，获取当前模型下载进度快照，就绪后为 null。 |
+
+---
+
+### 独立工具：`AudioResampler`
+
+SDK 导出了保持跨分片相位连续的高精度线性音频重采样器，便于单独构建自定义 Web Audio 处理流水线：
+
+```typescript
+import { AudioResampler } from '@firetable/stream-asr';
+
+const resampler = new AudioResampler(44100, 16000);
+const pcm16k = resampler.process(pcm44kChunk); // 自动跟踪跨 chunk 相位与最后采样点
+resampler.reset(); // 清空状态准备下一段音频流
+```
 
 ---
 

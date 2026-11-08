@@ -44,7 +44,7 @@ Please integrate @firetable/stream-asr on-device streaming speech recognition in
 2. Create a StreamRecognizer instance using Mode 3 (Causal Streaming + Neural VAD)
 3. Wire the microphone audio stream and handle `recognizing` / `recognized` text callbacks
 
-Refer to the official API docs: https://github.com/firetable/stream-asr#readme
+Refer to the official API docs: https://github.com/FireTable/stream-asr#readme
 ```
 
 ---
@@ -191,6 +191,8 @@ interface StreamRecognizerOptions {
   minSpeechDurationMs?: number;  // Default: 480
   maxPauseDurationMs?: number;   // Default: 2080
   maxSegmentDurationSec?: number;// Default: 20
+  maxRepeatTokens?: number;      // Default: 15
+  numThreads?: number;           // Default: 1 (Single-thread SIMD)
   enableCache?: boolean;         // Default: true (IndexedDB)
   enablePostSmooth?: boolean;    // Default: true
   chunks?: string[];             // Optional chunk URLs
@@ -202,14 +204,37 @@ interface StreamRecognizerOptions {
 
 ```typescript
 type EventMap = {
-  recognizing: RecognizingEvent;       // { text: string; vadState: 0 | 1 | 2; isFinal: boolean }
-  recognized: RecognizedEvent;         // { text: string; isFinal: boolean; tokenCount: number; inferenceMs: number }
-  vad_state_change: VadStateChangeEvent; // { state: 0 | 1 | 2; stateName: 'SILENCE' | 'SPEECH' | 'PAUSE' }
-  download_progress: DownloadProgressEvent; // { loaded: number; total: number; percent: number }
+  recognizing: RecognizingEvent;          // { text: string; vadState: 0 | 1 | 2; isFinal: boolean; isRefined?: boolean }
+  recognized: RecognizedEvent;            // { text: string; isFinal: boolean; isRefined?: boolean; tokenCount: number; inferenceMs: number }
+  refined: RecognizedEvent;               // { text: string; isFinal: boolean; isRefined?: boolean; tokenCount: number; inferenceMs: number }
+  vad_state_change: VadStateChangeEvent;  // { state: 0 | 1 | 2; stateName: 'SILENCE' | 'SPEECH' | 'PAUSE' }
+  download_progress: DownloadProgressEvent; // { loaded: number; total: number; percent: number; completedChunks?: number; totalChunks?: number }
   ready: void;
   error: Error;
   log: LogEvent;
 };
+```
+
+### Methods & Properties (`StreamRecognizer`)
+
+- `init(): Promise<void>` — Bootstraps WASM, spins up Web Worker, loads weights from cache/network.
+- `feed(inputPcm: Float32Array, inputSampleRate = 16000, isFinal = false): void` — Appends PCM frames (auto-resampled to 16kHz).
+- `finish(): void` — Flushes pending frames and finalizes speech.
+- `reset(): void` — Resets state for a new speech session without reloading weights.
+- `destroy(): void` — Terminates Web Worker and frees WebAssembly memory.
+- `setConfig(config: Partial<StreamRecognizerOptions>): void` — Hot-updates runtime options without model reload.
+- `on(event, listener): this` / `once(event, listener): this` / `off(event, listener): this` — Event subscriptions.
+- `isReady: boolean (getter)` — Returns true when ready to ingest audio.
+- `downloadProgress: DownloadProgressEvent | null (getter)` — Latest download snapshot.
+
+### Utility: `AudioResampler`
+
+```typescript
+import { AudioResampler } from '@firetable/stream-asr';
+
+const resampler = new AudioResampler(44100, 16000);
+const pcm16k = resampler.process(pcm44kChunk);
+resampler.reset();
 ```
 
 ---

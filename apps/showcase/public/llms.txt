@@ -4,7 +4,7 @@
 
 ## About
 - Site: https://asr.firetable.tech
-- GitHub: https://github.com/firetable/stream-asr
+- GitHub: https://github.com/FireTable/stream-asr
 - Package: `@firetable/stream-asr`
 - Author: FireTable
 - License: Apache-2.0

@@ -80,7 +80,7 @@ Please integrate @firetable/stream-asr on-device streaming speech recognition in
 2. Create a StreamRecognizer instance using Mode 3 (Causal Streaming + Neural VAD)
 3. Wire the microphone audio stream and handle `recognizing` / `recognized` text callbacks
 
-Refer to the official API docs: https://github.com/firetable/stream-asr#readme
+Refer to the official API docs: https://github.com/FireTable/stream-asr#readme
 ```
 
 ### Machine-Readable References
@@ -99,11 +99,13 @@ stream-asr/
 │   │   └── src/                     # Audio Frontend (FBank, CMVN), VAD & BPE Decoders
 │   └── sdk/                         # Browser TypeScript SDK (@firetable/stream-asr)
 │       ├── src/
+│       │   ├── index.ts             # Public library entry & class re-exports
 │       │   ├── recognizer.ts        # Main StreamRecognizer event harness & public API
-│       │   ├── worker.ts            # Isolated Web Worker thread pipeline
+│       │   ├── worker_source.ts     # Inlined Web Worker script & tensor orchestration
 │       │   ├── resampler.ts         # High-precision linear audio resampler
-│       │   ├── idb-cache.ts         # IndexedDB / CacheStorage offline persistent store
+│       │   ├── idb_cache.ts         # IndexedDB / CacheStorage offline persistent store
 │       │   └── types.ts             # Complete TypeScript interfaces & EventMap
+│       ├── wasm/                    # Packaged stream_asr.wasm and stream_asr.js
 │       ├── package.json
 │       └── tsconfig.json
 ├── apps/
@@ -262,16 +264,19 @@ Pass these options to `new StreamRecognizer(options)`:
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `modelUrl` | `string` | `'/model.bin'` | URL or path to packed model binary or chunked manifest (`model.json`). |
+| `modelVersion` | `string` | `'1.0.0'` | Model version tag. Bumping this evicts stale cache entries automatically. |
 | `wasmBaseUrl` | `string` | `'/wasm'` | Directory URL serving `stream_asr.wasm` and `stream_asr.js`. |
 | `mode` | `ASRMode` | `3` | `1` (Instant push-to-talk stream) or `3` (Universal stream + neural VAD). |
-| `sampleRate` | `number` | `16000` | Target acoustic sample rate in Hz. |
+| `sampleRate` | `number` | `16000` | Target acoustic sample rate in Hz (auto-resampled if hardware differs). |
 | `vadThreshold` | `number` | `0.5` | Neural VAD speech probability sensitivity (0.0 ~ 1.0). |
 | `speechPauseThreshold` | `number` | `0.925` | Ratio of silence frames required to finalize a sentence (0.1 ~ 0.99). |
 | `minSpeechDurationMs` | `number` | `480` | Minimum speech duration required to trigger sentence start. |
 | `maxPauseDurationMs` | `number` | `2080` | Silence pause duration before sentence boundary cut (in milliseconds). |
 | `maxSegmentDurationSec` | `number` | `20` | Max continuous audio seconds before forcing punctuation cutoff. |
+| `maxTokenNum` | `number` | `256` | Maximum token generation limit per recognized segment. |
+| `maxRepeatTokens` | `number` | `15` | Maximum consecutive identical tokens before breaking repetition loop. |
+| `numThreads` | `number` | `1` | Number of MNN backend compute threads for Wasm SIMD inference. |
 | `enableCache` | `boolean` | `true` | Persist model in browser IndexedDB for instant subsequent boots. |
-| `modelVersion` | `string` | `'1.0.0'` | Model version tag. Bumping this evicts stale cache entries automatically. |
 | `enablePostSmooth` | `boolean` | `true` | Filter speech disfluencies and normalize commas and periods. |
 | `chunks` | `string[]` | `undefined` | Optional list of chunk URLs to download concurrently and reassemble. |
 | `debug` | `boolean` | `true` | Enable verbose internal diagnostic logs. |
@@ -284,6 +289,7 @@ Pass these options to `new StreamRecognizer(options)`:
 | :--- | :--- | :--- |
 | `recognizing` | `RecognizingEvent` | Emitted on every live decoding step while voice is active. Contains interim text and VAD state. |
 | `recognized` | `RecognizedEvent` | Emitted when a natural pause or punctuation completes a sentence. Contains final text, token count, and inference time. |
+| `refined` | `RecognizedEvent` | Emitted when a sentence has been post-processed and smoothed by the second-pass punctuation/disfluency refiner. |
 | `vad_state_change` | `VadStateChangeEvent` | Emitted when speech activity shifts between `SILENCE` (0), `SPEECH` (1), and `PAUSE` (2). |
 | `download_progress` | `DownloadProgressEvent` | Emitted during model download with `percent`, `loaded`, `total`, and chunk counters. |
 | `ready` | `void` | Emitted when the WASM runtime has loaded the model and is ready to ingest audio. |
@@ -292,17 +298,35 @@ Pass these options to `new StreamRecognizer(options)`:
 
 ---
 
-### Core Methods
+### Core Methods & Properties
 
-| Method | Signature | Description |
+| Member | Signature / Type | Description |
 | :--- | :--- | :--- |
 | `init()` | `() => Promise<void>` | Compiles WASM, spins up the Web Worker, loads weights from cache/network, and readies the pipeline. |
-| `feed()` | `(pcm: Float32Array, sampleRate?: number, isLast?: boolean) => void` | Appends audio samples into the recognition queue. Auto-resamples to 16kHz if needed. |
+| `feed()` | `(inputPcm: Float32Array, inputSampleRate?: number, isFinal?: boolean) => void` | Appends audio samples into the recognition queue. Auto-resamples to 16kHz if needed. |
 | `finish()` | `() => void` | Flushes all remaining audio frames in the buffer and finalizes active sentences. |
 | `reset()` | `() => void` | Clears acoustic states, KV-caches, and VAD buffers without reloading weights. |
 | `destroy()` | `() => void` | Terminates the Web Worker and cleans up all memory allocations. |
-| `setMode()` | `(mode: ASRMode) => Promise<void>` | Dynamically switches between Mode 1 and Mode 3 at runtime. |
-| `isReady()` | `() => boolean` | Returns true if the recognizer is initialized and ready to transcribe. |
+| `setConfig()` | `(config: Partial<StreamRecognizerOptions>) => void` | Dynamically updates runtime parameters (such as `mode`, `vadThreshold`, `debug`) without reloading weights. |
+| `on()` | `(event: K, listener: Listener<EventMap[K]>) => this` | Subscribes an event listener callback. |
+| `once()` | `(event: K, listener: Listener<EventMap[K]>) => this` | Subscribes a one-time event listener callback. |
+| `off()` | `(event: K, listener: Listener<EventMap[K]>) => this` | Unsubscribes an event listener callback. |
+| `isReady` | `boolean (getter)` | Returns true if the recognizer is initialized and ready to transcribe. |
+| `downloadProgress` | `DownloadProgressEvent \| null (getter)` | Returns current download progress snapshot, or null once ready. |
+
+---
+
+### Utility: `AudioResampler`
+
+The SDK exports the standalone continuous linear resampler for custom audio processing pipelines:
+
+```typescript
+import { AudioResampler } from '@firetable/stream-asr';
+
+const resampler = new AudioResampler(44100, 16000);
+const pcm16k = resampler.process(pcm44kChunk); // Stateful cross-chunk phase tracking
+resampler.reset(); // Reset phase for new stream session
+```
 
 ---
 
@@ -351,7 +375,7 @@ This project is organized as a `pnpm` monorepo.
 ### Setup & Build
 ```bash
 # Clone the repository
-git clone https://github.com/firetable/stream-asr.git
+git clone https://github.com/FireTable/stream-asr.git
 cd stream-asr
 
 # Install dependencies

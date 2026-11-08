@@ -3,6 +3,7 @@ title: "Stream ASR — Complete Technical Reference & Knowledge Base"
 description: "Full-context developer documentation, architecture specification, and TypeScript SDK manual for Stream ASR — 100% on-device WebAssembly streaming speech recognition."
 url: "https://asr.firetable.tech/llms-full.txt"
 author: "FireTable"
+repository: "https://github.com/FireTable/stream-asr"
 license: "Apache-2.0"
 ---
 
@@ -113,6 +114,7 @@ recognizer.destroy();
 ### 2.3 Event Signatures (`EventMap`)
 - `recognizing`: `{ text: string, vadState: 0 | 1 | 2, isFinal: boolean }`
 - `recognized`: `{ text: string, isFinal: boolean, tokenCount: number, inferenceMs: number }`
+- `refined`: `{ text: string, isFinal: boolean, tokenCount: number, inferenceMs: number }`
 - `vad_state_change`: `{ state: 0 | 1 | 2, stateName: 'SILENCE' | 'SPEECH' | 'PAUSE' }`
 - `download_progress`: `{ loaded: number, total: number, percent: number }`
 - `ready`: `void`

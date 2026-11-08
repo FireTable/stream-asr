@@ -55,13 +55,13 @@ export default function SoundLabHeroOrb() {
   const [lang, setLang] = useState<Lang>(getInitialLang);
   const [isInitializing, setIsInitializing] = useState(false);
   const [displayProgress, setDisplayProgress] = useState(0); // 0 to 100%
-  const [initPhase, setInitPhase] = useState<'downloading' | 'initializing' | 'cached_loading'>('downloading');
+  const [initPhase, setInitPhase] = useState<'preparing' | 'downloading' | 'initializing' | 'cached_loading'>('preparing');
   const [downloadMB, setDownloadMB] = useState('0.0');
   const [isReady, setIsReady] = useState(false);
 
   const targetProgressRef = useRef(0);
   const currentProgressRef = useRef(0);
-  const initPhaseRef = useRef<'downloading' | 'initializing' | 'cached_loading'>('downloading');
+  const initPhaseRef = useRef<'preparing' | 'downloading' | 'initializing' | 'cached_loading'>('preparing');
   const downloadMBRef = useRef('0.0');
   const [isRecording, setIsRecording] = useState(false);
   const [isPlayingTest, setIsPlayingTest] = useState(false);
@@ -229,15 +229,18 @@ export default function SoundLabHeroOrb() {
       const current = currentProgressRef.current;
       const diff = target - current;
 
-      if (Math.abs(diff) > 0.05) {
+      // STRICT MONOTONIC PROGRESS GUARANTEE:
+      // The progress bar can ONLY move forward (diff > 0). It MUST NEVER rewind (diff < 0).
+      if (diff > 0.05) {
         currentProgressRef.current += diff * 0.14;
-      } else {
+      } else if (diff > 0) {
         currentProgressRef.current = target;
       }
+      // If diff <= 0, retain current progress, do not decrement.
 
       setDisplayProgress(currentProgressRef.current);
 
-      if (now - lastTextSync > 60) {
+      if (now - lastTextSync > 50) {
         lastTextSync = now;
         setInitPhase(initPhaseRef.current);
         setDownloadMB(downloadMBRef.current);
@@ -250,11 +253,36 @@ export default function SoundLabHeroOrb() {
     return () => cancelAnimationFrame(rafId);
   }, [isInitializing]);
 
-  // Clean unmount lifecycle (Engine initializes on user intent or interaction)
+  // Clean unmount lifecycle & idle engine pre-initialization
   useEffect(() => {
     isMountedRef.current = true;
+
+    // Trigger engine initialization on browser idle to provide zero-wait instant speech
+    let idleTimer: any = null;
+    const triggerIdleInit = () => {
+      if (!isMountedRef.current) return;
+      if (!isReady && !recognizerRef.current && !initPromiseRef.current) {
+        initEngine();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      if ('requestIdleCallback' in window) {
+        idleTimer = (window as any).requestIdleCallback(triggerIdleInit, { timeout: 2500 });
+      } else {
+        idleTimer = setTimeout(triggerIdleInit, 1200);
+      }
+    }
+
     return () => {
       isMountedRef.current = false;
+      if (typeof window !== 'undefined') {
+        if ('cancelIdleCallback' in window && idleTimer) {
+          (window as any).cancelIdleCallback(idleTimer);
+        } else if (idleTimer) {
+          clearTimeout(idleTimer);
+        }
+      }
       stopRecording();
       stopTestAudio();
       recognizerRef.current?.destroy();
@@ -272,12 +300,32 @@ export default function SoundLabHeroOrb() {
 
     setIsInitializing(true);
     const isCached = typeof window !== 'undefined' && localStorage.getItem('stream_asr_cached') === 'true';
-    initPhaseRef.current = isCached ? 'cached_loading' : 'downloading';
-    targetProgressRef.current = isCached ? 25 : 5;
+
+    // Initial phase: if cached, show cached loading; if not, show preparing (NEVER '0.0 MB')
+    initPhaseRef.current = isCached ? 'cached_loading' : 'preparing';
+    setInitPhase(initPhaseRef.current);
+    targetProgressRef.current = isCached ? 20 : 6;
     downloadMBRef.current = '0.0';
 
     let idbProgressTimer: any = null;
+    let prepTimer: any = null;
     let hasDownloaded = false;
+
+    // Gentle preparation crawl (6% -> 12%) so user feels responsiveness while worker & manifest load
+    if (!isCached) {
+      prepTimer = setInterval(() => {
+        if (!hasDownloaded && targetProgressRef.current < 12) {
+          targetProgressRef.current = Math.min(12, targetProgressRef.current + 0.6);
+        }
+      }, 150);
+    } else {
+      // When reading from IDB cache without network download, advance progress smoothly to 90%
+      idbProgressTimer = setInterval(() => {
+        if (!hasDownloaded && targetProgressRef.current < 90) {
+          targetProgressRef.current = Math.min(90, targetProgressRef.current + 12);
+        }
+      }, 70);
+    }
 
     initPromiseRef.current = (async () => {
       try {
@@ -317,29 +365,35 @@ export default function SoundLabHeroOrb() {
             clearInterval(idbProgressTimer);
             idbProgressTimer = null;
           }
-          initPhaseRef.current = 'downloading';
-          // Single real-time MB value (e.g. "24.5")
-          downloadMBRef.current = (loaded / (1024 * 1024)).toFixed(1);
-          // Download maps 0% ~ 100% of network data to 0% ~ 90% of button progress
-          targetProgressRef.current = Math.min(90, Math.round(percent * 0.9));
+          if (prepTimer) {
+            clearInterval(prepTimer);
+            prepTimer = null;
+          }
+
+          // Only switch to 'downloading' once bytes actually begin arriving (> 0)
+          if (loaded > 0) {
+            initPhaseRef.current = 'downloading';
+            downloadMBRef.current = (loaded / (1024 * 1024)).toFixed(1);
+          }
+
+          // Download maps 0% ~ 100% of network data to 12% ~ 90% of button progress
+          const downloadTarget = Math.min(90, Math.round(12 + (percent / 100) * 78));
+          targetProgressRef.current = Math.max(targetProgressRef.current, downloadTarget);
         });
 
         recognizer.on('error', (err) => {
           console.error('[StreamRecognizer Error]:', err);
         });
 
-        // When reading from IDB cache without network download, advance progress smoothly to 90%
-        idbProgressTimer = setInterval(() => {
-          if (!hasDownloaded && targetProgressRef.current < 90) {
-            targetProgressRef.current += 15;
-          }
-        }, 80);
-
         await recognizer.init();
 
         if (idbProgressTimer) {
           clearInterval(idbProgressTimer);
           idbProgressTimer = null;
+        }
+        if (prepTimer) {
+          clearInterval(prepTimer);
+          prepTimer = null;
         }
 
         if (!isMountedRef.current) {
@@ -356,8 +410,8 @@ export default function SoundLabHeroOrb() {
         initPhaseRef.current = 'initializing';
         targetProgressRef.current = 100;
 
-        // Brief 200ms completion hold so user sees smooth completion glint
-        await new Promise(res => setTimeout(res, 200));
+        // Brief 250ms completion hold so user sees smooth completion glint
+        await new Promise(res => setTimeout(res, 250));
 
         recognizerRef.current = recognizer;
         setIsReady(true);
@@ -365,6 +419,7 @@ export default function SoundLabHeroOrb() {
         console.error('Failed to init engine:', err);
       } finally {
         if (idbProgressTimer) clearInterval(idbProgressTimer);
+        if (prepTimer) clearInterval(prepTimer);
         if (isMountedRef.current) {
           setIsInitializing(false);
         }
@@ -788,7 +843,9 @@ export default function SoundLabHeroOrb() {
                         ? `${t.orbDownloading || '下载模型'} ${downloadMB} MB`
                         : initPhase === 'cached_loading'
                           ? (t.orbLoadingCache || '正在加载本地模型...')
-                          : (t.orbInitializing || '正在初始化引擎...')}
+                          : initPhase === 'preparing'
+                            ? (t.orbPreparing || '正在准备模型...')
+                            : (t.orbInitializing || '正在初始化引擎...')}
                     </span>
                   </div>
                 </>
