@@ -1,0 +1,68 @@
+.snd-orb {
+  position: relative;
+  width: clamp(220px, 32vh, 280px);
+  height: clamp(220px, 32vh, 280px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  padding: 0;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), filter 0.3s ease;
+  user-select: none;
+  /* Light mode: multilayer soft organic shadow with natural atmospheric dispersion */
+  filter: drop-shadow(0 20px 48px rgba(14, 165, 233, 0.18)) drop-shadow(0 8px 24px rgba(15, 23, 42, 0.05));
+}
+
+/* Dark mode: dual-layer ethereal cyan/sky-blue Gaussian glow that diffuses seamlessly into space */
+.dark .snd-orb {
+  filter: drop-shadow(0 0 45px rgba(56, 189, 248, 0.28)) drop-shadow(0 0 95px rgba(14, 165, 233, 0.16));
+}
+
+@media (min-width: 640px) {
+  .snd-orb {
+    width: clamp(240px, 34vh, 340px);
+    height: clamp(240px, 34vh, 340px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .snd-orb {
+    width: clamp(260px, 36vh, 380px);
+    height: clamp(260px, 36vh, 380px);
+  }
+}
+
+.snd-orb-compact {
+  width: 220px !important;
+  height: 220px !important;
+}
+
+@media (min-width: 640px) {
+  .snd-orb-compact {
+    width: 280px !important;
+    height: 280px !important;
+  }
+}
+
+.snd-orb:hover {
+  transform: scale(1.02);
+  filter: drop-shadow(0 24px 56px rgba(14, 165, 233, 0.24)) drop-shadow(0 10px 28px rgba(15, 23, 42, 0.06));
+}
+
+.dark .snd-orb:hover {
+  filter: drop-shadow(0 0 60px rgba(56, 189, 248, 0.36)) drop-shadow(0 0 115px rgba(14, 165, 233, 0.22));
+}
+
+.snd-orb:active {
+  transform: scale(0.98);
+}
+
+.snd-orb-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}

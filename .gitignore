@@ -1,0 +1,19 @@
+node_modules
+.DS_Store
+dist
+build
+*.log
+*.bin
+model_chunks/
+temp/
+.astro/
+.wrangler/
+__pycache__/
+
+# Private maintainer notes & offline reverse tools
+AGENTS.md
+tools/pack_model.py
+pack_model.py
+*.flute
+*.pthlite
+*.packed

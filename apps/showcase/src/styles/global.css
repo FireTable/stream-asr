@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* Lenis smooth scrolling rules */
+  html.lenis, html.lenis body {
+    height: auto;
+  }
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+  .lenis.lenis-stopped {
+    overflow: hidden;
+  }
+  .lenis.lenis-scrolling iframe {
+    pointer-events: none;
+  }
+
+  body {
+    @apply bg-zinc-50 text-zinc-900 dark:bg-[#08090a] dark:text-zinc-100 antialiased;
+    overflow-x: hidden;
+  }
+}
+
+/* Linear-style premium glass and hairline borders */
+.glass-panel {
+  @apply bg-white/70 backdrop-blur-xl border border-zinc-200/80 shadow-sm dark:bg-[#0c0d10]/80 dark:border-white/[0.08] dark:shadow-2xl;
+}
+
+.glass-card {
+  @apply bg-white/60 dark:bg-zinc-900/40 backdrop-blur-xl border border-zinc-200/70 dark:border-white/[0.06] rounded-2xl transition-all duration-300;
+}
+
+.glass-card:hover {
+  @apply dark:border-sky-400/30 dark:bg-zinc-900/60;
+  box-shadow: 0 0 30px -10px rgba(56, 189, 248, 0.15);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 30px -5px rgba(56, 189, 248, 0.35);
+}
+
+.glow-pill {
+  box-shadow: 0 0 16px -2px rgba(56, 189, 248, 0.4);
+}
+
+/* React Bits signature rotating border beam */
+@keyframes borderBeam {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-border-beam {
+  animation: borderBeam 3s linear infinite;
+}
+
+/* Subtle Linear radial background mesh - Smooth, organic top-centered falloff */
+.linear-mesh {
+  background-image: 
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(56, 189, 248, 0.12), transparent 80%);
+}
+
+.dark .linear-mesh {
+  background-image: 
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(56, 189, 248, 0.15), transparent 80%);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.4);
+}
+
+/* Cinematic Character-by-Character Subtitle Reveal (Speech Streaming) */
+@keyframes cinematicChar {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.94);
+    filter: blur(5px);
+    text-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+  }
+  50% {
+    opacity: 0.85;
+    filter: blur(1px);
+    text-shadow: 0 0 4px rgba(56, 189, 248, 0.3);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+    text-shadow: none;
+  }
+}
+
+.animate-cinematic-char {
+  animation: cinematicChar 0.26s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+/* No scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Debug Terminal Contained Scrollbar (No Scroll Bleed) */
+.debug-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+}
+
+.debug-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.debug-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.debug-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+}
+
+.debug-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.5);
+}
+
+/* Blur & Upward Float Reveal */
+@keyframes blurReveal {
+  0% {
+    opacity: 0;
+    filter: blur(12px);
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
+}
+
+.animate-blur-reveal {
+  animation: blurReveal 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: filter, opacity, transform;
+}
+
+.animate-blur-reveal-delay {
+  animation: blurReveal 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.12s backwards;
+  will-change: filter, opacity, transform;
+}
+
+/* Liquid Progress Button Specular Shimmer Sweep */
+@keyframes liquidShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
+}
+
+.animate-liquid-shimmer {
+  animation: liquidShimmer 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  will-change: transform;
+}

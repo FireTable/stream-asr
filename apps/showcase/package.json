@@ -1,0 +1,44 @@
+{
+  "name": "@firetable/stream-asr-showcase",
+  "version": "0.1.0",
+  "description": "Interactive Sound Lab & Playground for @firetable/stream-asr on-device speech recognition.",
+  "private": true,
+  "author": {
+    "name": "FireTable",
+    "email": "firetable@foxmail.com",
+    "url": "https://firetable.tech"
+  },
+  "homepage": "https://asr.firetable.tech",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/firetable/stream-asr.git",
+    "directory": "apps/showcase"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "astro dev --port 4322 --host",
+    "build": "astro build",
+    "preview": "astro preview --port 4322 --host",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astrojs/react": "^4.2.0",
+    "@astrojs/tailwind": "^5.1.5",
+    "@firetable/stream-asr": "workspace:*",
+    "astro": "^5.4.0",
+    "lenis": "^1.3.27",
+    "lucide-react": "^1.16.0",
+    "motion": "^14.10.1",
+    "ogl": "^1.0.11",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^3.4.17"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "playwright": "^1.65.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,128 @@
+---
+title: "Stream ASR — Complete Technical Reference & Knowledge Base"
+description: "Full-context developer documentation, architecture specification, and TypeScript SDK manual for Stream ASR — 100% on-device WebAssembly streaming speech recognition."
+url: "https://asr.firetable.tech/llms-full.txt"
+author: "FireTable"
+license: "Apache-2.0"
+---
+
+# Stream ASR — Complete Technical Reference & Knowledge Base
+
+> Ultra-fast, browser-native WebAssembly streaming speech recognition runtime powered by MNN & SIMD128. Zero cloud dependencies, zero audio uploaded to any server, fully offline-ready.
+
+## 1. System Architecture & Technical Principles
+
+Stream ASR operates entirely on the client side inside modern web browsers. It eliminates the standard client-server streaming speech recognition topology (such as gRPC/WebSocket audio streaming) and replaces it with an in-browser neural execution pipeline.
+
+### 1.1 Audio Ingestion & Worklet Pipeline
+- **Sample Rate**: 16,000 Hz, single-channel (Mono), 32-bit floating point PCM (`Float32Array`).
+- **Resampling**: Built-in linear interpolation resampler automatically converts arbitrary hardware sample rates (44.1kHz, 48kHz, etc.) down to 16kHz on the fly.
+- **Processing Unit**: Runs on a dedicated Web Audio `AudioWorkletNode` or `ScriptProcessorNode` isolated from the browser's DOM / UI thread.
+- **Chunk Size**: Emits audio windows in chunks (typically 160ms / 2,560 samples).
+- **Feature Extraction**: 80-dimensional Kaldi Log-Mel Filterbank with CMVN (Cepstral Mean and Variance Normalization) computed directly in WebAssembly.
+
+### 1.2 Multi-Threaded Worker Topology
+To avoid dropped audio frames and UI frame rate stuttering:
+- **Main Thread**: Manages UI state, microphone permissions, audio visualization (e.g. WebGL canvas or Hero Orb), and user interaction.
+- **Worker Thread**: Hosts the compiled WebAssembly binary and neural network weights. Incoming audio chunks are transferred via `postMessage` (`TransferableArrayBuffer`) to eliminate memory copy overhead.
+
+### 1.3 WebAssembly & SIMD128 Neural Runtime
+- **Inference Engine**: Mobile Neural Network (MNN) compiled to WebAssembly via Emscripten with SIMD128 and O3 optimizations.
+- **Vector Acceleration**: WebAssembly SIMD128 (Single Instruction, Multiple Data) instructions accelerate matrix multiplication, convolution, and layer normalization operations.
+- **Quantization**: INT8 / FP16 quantized model weights reducing the binary container footprint to ~175MB without compromising recognition accuracy.
+- **Streaming State Management**: Causal convolution caches and chunked self-attention key/value states are maintained across audio chunks, ensuring sub-50ms inference time per chunk.
+
+### 1.4 Cache & Offline Storage Strategy
+- **Initial Download**: When requested for the first time, model weights (~175MB) and WASM binaries (~2.2MB) are streamed via `ReadableStream` with real-time download percentage calculation.
+- **IndexedDB Persistence**: Resources are saved directly into the browser's persistent `IndexedDB` (`stream-asr-cache`).
+- **Subsequent Boots**: Zero network requests. Weights and binaries are loaded directly from local browser storage within ~300ms, enabling full offline functionality on airplanes, subways, and secure intranets.
+
+---
+
+## 2. TypeScript SDK Manual (`@firetable/stream-asr`)
+
+### 2.1 Installation
+```bash
+# npm
+npm install @firetable/stream-asr
+
+# pnpm
+pnpm add @firetable/stream-asr
+
+# yarn
+yarn add @firetable/stream-asr
+
+# bun
+bun add @firetable/stream-asr
+```
+
+### 2.2 Core API: `StreamRecognizer`
+
+```typescript
+import { StreamRecognizer } from '@firetable/stream-asr';
+
+// 1. Instantiate the recognizer
+const recognizer = new StreamRecognizer({
+  modelUrl: '/model.bin',           // Path or URL to model binary container
+  wasmBaseUrl: '/wasm',             // Directory hosting stream_asr.wasm and stream_asr.js
+  mode: 3,                          // 3 = Universal Streaming + Neural VAD (Default)
+  vadThreshold: 0.5,                // Speech activation sensitivity (0.0 ~ 1.0)
+  enableCache: true,                // Enable IndexedDB offline cache
+});
+
+// 2. Listen to download & initialization events
+recognizer.on('download_progress', ({ loaded, total, percent }) => {
+  console.log(`Downloading model weights: ${percent}% (${loaded} / ${total} bytes)`);
+});
+
+recognizer.on('ready', () => {
+  console.log('Stream ASR engine successfully initialized and ready');
+});
+
+// 3. Listen to live transcription events
+recognizer.on('recognizing', ({ text, vadState }) => {
+  console.log(`[Streaming Interim]: ${text}`);
+});
+
+recognizer.on('recognized', ({ text, isFinal, tokenCount, inferenceMs }) => {
+  console.log(`[Sentence Final]: ${text} (${tokenCount} tokens in ${inferenceMs}ms)`);
+});
+
+recognizer.on('vad_state_change', ({ state, stateName }) => {
+  console.log(`[VAD]: ${stateName}`); // 'SILENCE' | 'SPEECH' | 'PAUSE'
+});
+
+recognizer.on('error', (err) => {
+  console.error('ASR Engine Error:', err);
+});
+
+// 4. Initialize engine (loads from cache or downloads)
+await recognizer.init();
+
+// 5. Feed audio data continuously
+// pcmData: Float32Array containing audio samples (auto-resampled to 16kHz)
+recognizer.feed(pcmData, audioContext.sampleRate);
+
+// 6. Signal end of speech session to flush pending decoding states
+recognizer.finish();
+
+// 7. Cleanup resources
+recognizer.destroy();
+```
+
+### 2.3 Event Signatures (`EventMap`)
+- `recognizing`: `{ text: string, vadState: 0 | 1 | 2, isFinal: boolean }`
+- `recognized`: `{ text: string, isFinal: boolean, tokenCount: number, inferenceMs: number }`
+- `vad_state_change`: `{ state: 0 | 1 | 2, stateName: 'SILENCE' | 'SPEECH' | 'PAUSE' }`
+- `download_progress`: `{ loaded: number, total: number, percent: number }`
+- `ready`: `void`
+- `error`: `Error`
+- `log`: `{ timestamp: number, level: string, tag: string, message: string }`
+
+---
+
+## 3. Supported Languages & Vocabulary Scope
+- **Official Languages**: Mandarin Chinese & English.
+- **Acoustic Frontend**: 80-bin Kaldi FBank with CMVN.
+- **Tokenizer**: 64,000 Byte-Level BPE subword dictionary.
+- **Punctuation**: Adaptive pause segmentation generating commas and periods on the fly.

@@ -1,0 +1,68 @@
+{
+  "name": "@firetable/stream-asr",
+  "version": "0.1.0",
+  "description": "Ultra-fast, 100% on-device WebAssembly streaming speech recognition runtime powered by MNN.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./wasm/*": "./wasm/*"
+  },
+  "files": [
+    "dist",
+    "wasm",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/firetable/stream-asr.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://asr.firetable.tech",
+  "bugs": {
+    "url": "https://github.com/firetable/stream-asr/issues"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "type-check": "tsc --noEmit"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "asr",
+    "stt",
+    "speech-to-text",
+    "webassembly",
+    "wasm",
+    "mnn",
+    "simd128",
+    "streaming-asr",
+    "on-device",
+    "offline-speech",
+    "voice-recognition",
+    "neural-vad",
+    "privacy-first"
+  ],
+  "author": {
+    "name": "FireTable",
+    "email": "firetable@foxmail.com",
+    "url": "https://firetable.tech"
+  },
+  "funding": "https://firetable.tech",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

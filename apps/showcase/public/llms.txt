@@ -1,0 +1,73 @@
+# Stream ASR — 100% On-Device Streaming Speech Recognition
+
+> Ultra-fast, browser-native WebAssembly streaming speech recognition runtime powered by MNN & SIMD128. Zero cloud dependencies, zero audio uploaded to any server, fully offline-ready.
+
+## About
+- Site: https://asr.firetable.tech
+- GitHub: https://github.com/firetable/stream-asr
+- Package: `@firetable/stream-asr`
+- Author: FireTable
+- License: Apache-2.0
+- Architecture: WebAssembly + SIMD128 + Web Workers + AudioWorklet
+
+## Key Capabilities
+- **Sub-50ms Chunk Latency**: Real-time acoustic processing with immediate text output as the user speaks.
+- **100% Client-Side Privacy**: Zero audio bytes uploaded to the cloud. All computation occurs locally on the user's hardware.
+- **Full Offline Operation**: Browser IndexedDB / CacheStorage caches model tensors and WASM binaries for instant subsequent boots without network access.
+- **Hardware Acceleration**: SIMD128-vectorized MNN tensor kernels delivering RTF 0.45x on standard single-core CPUs.
+- **Lightweight Footprint**: ~175MB quantized model weights with < 250MB peak memory during live recognition.
+- **Languages Supported**: Chinese (Mandarin) and English bilingual recognition.
+
+## Quick Start (TypeScript / JavaScript)
+```bash
+# Install via your project's package manager
+npm install @firetable/stream-asr
+# or: pnpm add @firetable/stream-asr
+```
+
+```typescript
+import { StreamRecognizer } from '@firetable/stream-asr';
+
+const recognizer = new StreamRecognizer({
+  modelUrl: '/model.bin',
+  wasmBaseUrl: '/wasm',
+  mode: 3, // Universal Streaming + Neural VAD
+  vadThreshold: 0.5,
+  enableCache: true,
+});
+
+recognizer.on('download_progress', (e) => {
+  console.log(`Downloading: ${e.percent}% (${e.loaded}/${e.total} bytes)`);
+});
+
+recognizer.on('ready', () => {
+  console.log('Engine ready for live audio streaming');
+});
+
+recognizer.on('recognizing', ({ text, vadState }) => {
+  console.log('[Streaming Partial]:', text);
+});
+
+recognizer.on('recognized', ({ text, tokenCount, inferenceMs }) => {
+  console.log('[Sentence Final]:', text);
+});
+
+await recognizer.init();
+
+// Stream 16kHz Float32 PCM chunks from Web Audio API
+// (Built-in auto-resampler supports 44.1kHz / 48kHz seamlessly)
+recognizer.feed(pcmFloat32Array, audioContext.sampleRate);
+```
+
+## System Requirements
+- Modern Chromium-based browser (Chrome, Edge 90+)
+- Safari 16.4+ (iOS & macOS)
+- Firefox 90+
+- WebAssembly with SIMD128 support (zero COOP/COEP isolation headers needed)
+
+## Resources & Links
+- [Interactive Studio](https://asr.firetable.tech/#hero)
+- [Architecture & Benchmarks](https://asr.firetable.tech/#features)
+- [Quick Start Guide](https://asr.firetable.tech/#cta)
+- [Full LLM Knowledge Base](https://asr.firetable.tech/llms-full.txt)
+- [Agent Auth Policy](https://asr.firetable.tech/auth.md)

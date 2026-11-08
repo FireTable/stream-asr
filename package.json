@@ -1,0 +1,49 @@
+{
+  "name": "stream-asr",
+  "version": "0.1.0",
+  "description": "Ultra-fast, 100% on-device WebAssembly streaming speech recognition monorepo powered by MNN.",
+  "private": true,
+  "packageManager": "pnpm@10.12.2",
+  "author": {
+    "name": "FireTable",
+    "email": "firetable@foxmail.com",
+    "url": "https://firetable.tech"
+  },
+  "homepage": "https://asr.firetable.tech",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firetable/stream-asr.git"
+  },
+  "bugs": {
+    "url": "https://github.com/firetable/stream-asr/issues"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "asr",
+    "speech-to-text",
+    "stt",
+    "webassembly",
+    "wasm",
+    "simd128",
+    "mnn",
+    "on-device",
+    "streaming-asr",
+    "offline-speech",
+    "voice-activity-detection",
+    "vad"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @firetable/stream-asr-showcase dev",
+    "build": "pnpm build:sdk && pnpm build:showcase",
+    "build:sdk": "pnpm --filter @firetable/stream-asr build",
+    "build:showcase": "pnpm --filter @firetable/stream-asr-showcase build && rm -f apps/showcase/dist/model.bin",
+    "build:core": "bash packages/core/build.sh",
+    "preview": "pnpm --filter @firetable/stream-asr-showcase preview",
+    "type-check": "pnpm --filter @firetable/stream-asr type-check && pnpm --filter @firetable/stream-asr-showcase type-check",
+    "test": "node tools/test_node.mjs",
+    "bump": "node scripts/bump.mjs",
+    "bump:patch": "node scripts/bump.mjs patch",
+    "bump:minor": "node scripts/bump.mjs minor",
+    "bump:major": "node scripts/bump.mjs major"
+  }
+}

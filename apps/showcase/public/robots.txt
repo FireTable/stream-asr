@@ -1,0 +1,17 @@
+# Stream ASR — Crawler & Agent Directives
+# https://asr.firetable.tech
+
+User-agent: *
+Content-Signal: ai-train=yes, search=yes, ai-input=yes
+Allow: /
+
+# AI & LLM Endpoints (GEO Discovery)
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /auth.md
+Allow: /og.png
+Allow: /favicon.svg
+
+# Sitemaps
+Sitemap: https://asr.firetable.tech/sitemap.xml
+Host: https://asr.firetable.tech
