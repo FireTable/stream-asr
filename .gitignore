@@ -9,9 +9,8 @@ temp/
 .wrangler/
 __pycache__/
 
-# Allow showcase split model chunks
-!apps/showcase/public/model_chunks/
-!apps/showcase/public/model_chunks/**
+# Keep large model chunks out of git repo (served via CDN)
+apps/showcase/public/model_chunks/
 
 # Private maintainer notes & offline reverse tools
 AGENTS.md
