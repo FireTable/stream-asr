@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "magic": "STT1",
+  "totalSize": 183178589,
+  "chunkSize": 20971520,
+  "chunkCount": 9,
+  "chunks": [
+    {
+      "name": "model.bin.0",
+      "size": 20971520,
+      "offset": 0
+    },
+    {
+      "name": "model.bin.1",
+      "size": 20971520,
+      "offset": 20971520
+    },
+    {
+      "name": "model.bin.2",
+      "size": 20971520,
+      "offset": 41943040
+    },
+    {
+      "name": "model.bin.3",
+      "size": 20971520,
+      "offset": 62914560
+    },
+    {
+      "name": "model.bin.4",
+      "size": 20971520,
+      "offset": 83886080
+    },
+    {
+      "name": "model.bin.5",
+      "size": 20971520,
+      "offset": 104857600
+    },
+    {
+      "name": "model.bin.6",
+      "size": 20971520,
+      "offset": 125829120
+    },
+    {
+      "name": "model.bin.7",
+      "size": 20971520,
+      "offset": 146800640
+    },
+    {
+      "name": "model.bin.8",
+      "size": 15406429,
+      "offset": 167772160
+    }
+  ]
+}

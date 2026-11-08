@@ -4,11 +4,14 @@ dist
 build
 *.log
 *.bin
-model_chunks/
 temp/
 .astro/
 .wrangler/
 __pycache__/
+
+# Allow showcase split model chunks
+!apps/showcase/public/model_chunks/
+!apps/showcase/public/model_chunks/**
 
 # Private maintainer notes & offline reverse tools
 AGENTS.md
