@@ -1,6 +1,6 @@
 {
   "name": "@firetable/stream-asr-showcase",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Interactive Sound Lab & Playground for @firetable/stream-asr on-device speech recognition.",
   "private": true,
   "author": {
