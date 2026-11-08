@@ -86,20 +86,20 @@ export default function LangDropdown() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors focus:outline-none shrink-0 flex items-center justify-center"
+        className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors focus:outline-none shrink-0 flex items-center justify-center"
         aria-haspopup="true"
         aria-expanded={isOpen}
         aria-label="Select Language"
         title={currentOption.label}
       >
-        <Globe className="w-4 h-4 text-current" />
+        <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-current" />
       </button>
 
       {isOpen && (
         <div
           role="menu"
           aria-orientation="vertical"
-          className="absolute right-0 mt-2 w-36 rounded-2xl border border-zinc-200/80 dark:border-white/[0.08] bg-white/95 dark:bg-[#0c0d12]/95 backdrop-blur-2xl shadow-xl dark:shadow-2xl p-1 z-50 animate-in fade-in-0 zoom-in-95 origin-top-right focus:outline-none"
+          className="absolute right-0 mt-1.5 sm:mt-2 w-36 rounded-2xl border border-zinc-200/80 dark:border-white/[0.08] bg-white/95 dark:bg-[#0c0d12]/95 backdrop-blur-2xl shadow-xl dark:shadow-2xl p-1 z-50 animate-in fade-in-0 zoom-in-95 origin-top-right focus:outline-none"
         >
           {LANGUAGES.map((option) => {
             const isSelected = option.code === currentLang;

@@ -12,10 +12,10 @@
   "homepage": "https://asr.firetable.tech",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/firetable/stream-asr.git"
+    "url": "git+https://github.com/FireTable/stream-asr.git"
   },
   "bugs": {
-    "url": "https://github.com/firetable/stream-asr/issues"
+    "url": "https://github.com/FireTable/stream-asr/issues"
   },
   "license": "Apache-2.0",
   "keywords": [

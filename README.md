@@ -312,7 +312,7 @@ Pass these options to `new StreamRecognizer(options)`:
 | `once()` | `(event: K, listener: Listener<EventMap[K]>) => this` | Subscribes a one-time event listener callback. |
 | `off()` | `(event: K, listener: Listener<EventMap[K]>) => this` | Unsubscribes an event listener callback. |
 | `isReady` | `boolean (getter)` | Returns true if the recognizer is initialized and ready to transcribe. |
-| `downloadProgress` | `DownloadProgressEvent \| null (getter)` | Returns current download progress snapshot, or null once ready. |
+| `downloadProgress` | `DownloadProgressEvent` &#124; `null (getter)` | Returns current download progress snapshot, or null once ready. |
 
 ---
 

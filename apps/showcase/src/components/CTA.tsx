@@ -180,7 +180,7 @@ const HighlightedPrompt = ({ lang }: { lang: Lang }) => {
         </p>
         <p className="text-zinc-400 pt-0.5">
           <span>Refer to the official API docs: </span>
-          <span className="text-sky-400 underline underline-offset-2 decoration-sky-400/40">https://github.com/firetable/stream-asr#readme</span>
+          <span className="text-sky-400 underline underline-offset-2 decoration-sky-400/40">https://github.com/FireTable/stream-asr#readme</span>
         </p>
       </div>
     );
@@ -214,7 +214,7 @@ const HighlightedPrompt = ({ lang }: { lang: Lang }) => {
       </p>
       <p className="text-zinc-400 pt-0.5">
         <span>参考官方文档与示例：</span>
-        <span className="text-sky-400 underline underline-offset-2 decoration-sky-400/40">https://github.com/firetable/stream-asr#readme</span>
+        <span className="text-sky-400 underline underline-offset-2 decoration-sky-400/40">https://github.com/FireTable/stream-asr#readme</span>
       </p>
     </div>
   );
@@ -250,8 +250,8 @@ export default function CTA() {
 
   const aiPromptText = c.aiPrompt || (
     lang === 'en'
-      ? `Please integrate @firetable/stream-asr on-device streaming speech recognition into this project:\n\n1. Install @firetable/stream-asr using this project's package manager (npm / pnpm / yarn / bun)\n2. Create a StreamRecognizer instance using Mode 3 (Causal Streaming + Neural VAD)\n3. Wire the microphone audio stream and handle \`recognizing\` / \`recognized\` text callbacks\n\nRefer to the official API docs: https://github.com/firetable/stream-asr#readme`
-      : `请在当前项目中集成 @firetable/stream-asr 端侧流式语音识别：\n\n1. 根据本项目包管理器（npm / pnpm / yarn / bun）安装 @firetable/stream-asr\n2. 初始化 StreamRecognizer 实例（采用 Mode 3 通用流式模式，启用神经网络 VAD）\n3. 接入麦克风音频流并监听 recognizing / recognized 实时文本回调\n\n参考官方文档与示例：https://github.com/firetable/stream-asr#readme`
+      ? `Please integrate @firetable/stream-asr on-device streaming speech recognition into this project:\n\n1. Install @firetable/stream-asr using this project's package manager (npm / pnpm / yarn / bun)\n2. Create a StreamRecognizer instance using Mode 3 (Causal Streaming + Neural VAD)\n3. Wire the microphone audio stream and handle \`recognizing\` / \`recognized\` text callbacks\n\nRefer to the official API docs: https://github.com/FireTable/stream-asr#readme`
+      : `请在当前项目中集成 @firetable/stream-asr 端侧流式语音识别：\n\n1. 根据本项目包管理器（npm / pnpm / yarn / bun）安装 @firetable/stream-asr\n2. 初始化 StreamRecognizer 实例（采用 Mode 3 通用流式模式，启用神经网络 VAD）\n3. 接入麦克风音频流并监听 recognizing / recognized 实时文本回调\n\n参考官方文档与示例：https://github.com/FireTable/stream-asr#readme`
   );
 
   const copyAiPrompt = async () => {
@@ -287,7 +287,7 @@ export default function CTA() {
   };
 
   return (
-    <section id="cta" className="w-full max-w-6xl px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-16 sm:pb-24 scroll-mt-20">
+    <section id="cta" className="w-full max-w-6xl px-4 sm:px-6 lg:px-8 pt-6 sm:pt-10 pb-16 sm:pb-24 scroll-mt-14 sm:scroll-mt-20">
       {/* =========================================================
           SECTION HEADER (STRICTLY IDENTICAL TO BENTOGRID TYPOGRAPHY SCALE)
           ========================================================= */}
@@ -420,7 +420,7 @@ export default function CTA() {
         <div className="mt-6 pt-4 border-t border-zinc-200/80 dark:border-white/[0.08] flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <a
-              href="https://github.com/firetable/stream-asr"
+              href="https://github.com/FireTable/stream-asr"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] bg-zinc-950 text-white hover:bg-zinc-800 shadow-xs dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100"

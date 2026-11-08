@@ -11,7 +11,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./wasm/*": "./wasm/*"
+    "./wasm/*": "./wasm/*",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -24,12 +25,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/firetable/stream-asr.git",
+    "url": "https://github.com/FireTable/stream-asr.git",
     "directory": "packages/sdk"
   },
   "homepage": "https://asr.firetable.tech",
   "bugs": {
-    "url": "https://github.com/firetable/stream-asr/issues"
+    "url": "https://github.com/FireTable/stream-asr/issues"
   },
   "scripts": {
     "build": "tsc",

@@ -305,7 +305,7 @@ async function startMicrophoneASR() {
 | `once()` | `(event: K, listener: Listener<EventMap[K]>) => this` | 注册单次触发事件监听器。 |
 | `off()` | `(event: K, listener: Listener<EventMap[K]>) => this` | 注销事件监听器。 |
 | `isReady` | `boolean (getter)` | 属性，返回引擎是否已完成初始化并就绪。 |
-| `downloadProgress` | `DownloadProgressEvent \| null (getter)` | 属性，获取当前模型下载进度快照，就绪后为 null。 |
+| `downloadProgress` | `DownloadProgressEvent` &#124; `null (getter)` | 属性，获取当前模型下载进度快照，就绪后为 null。 |
 
 ---
 

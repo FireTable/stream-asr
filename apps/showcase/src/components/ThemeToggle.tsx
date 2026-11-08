@@ -31,11 +31,11 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="p-2 rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors focus:outline-none flex items-center justify-center shrink-0"
+      className="p-1.5 sm:p-2 rounded-full text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.05] transition-colors focus:outline-none flex items-center justify-center shrink-0"
       title="Toggle Theme"
       aria-label="Toggle Theme"
     >
-      {theme === 'dark' ? <Sun className="w-4 h-4 text-current" /> : <Moon className="w-4 h-4 text-current" />}
+      {theme === 'dark' ? <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-current" /> : <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-current" />}
     </button>
   );
 }
