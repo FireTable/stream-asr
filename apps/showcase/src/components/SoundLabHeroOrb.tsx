@@ -429,11 +429,9 @@ export default function SoundLabHeroOrb() {
             prepTimer = null;
           }
 
-          // Only switch to 'downloading' once bytes actually begin arriving (> 0)
-          if (loaded > 0) {
-            initPhaseRef.current = 'downloading';
-            downloadMBRef.current = (loaded / (1024 * 1024)).toFixed(1);
-          }
+          // Switch to 'downloading' immediately starting from 0.0 MB in real-time
+          initPhaseRef.current = 'downloading';
+          downloadMBRef.current = (loaded / (1024 * 1024)).toFixed(1);
 
           // Download maps 0% ~ 100% of network data to 12% ~ 90% of button progress
           const downloadTarget = Math.min(90, Math.round(12 + (percent / 100) * 78));

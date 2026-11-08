@@ -279,15 +279,55 @@ export class StreamRecognizer {
         const loadedPerChunk: number[] = new Array(chunkCount).fill(0);
         let completedChunks = 0;
 
+        // Throttled progress emitter: guarantees smooth 60fps UI updates without choking the main thread
+        let lastEmitTime = 0;
+        let pendingEmitTimer: any = null;
+
+        const doEmit = () => {
+          if (pendingEmitTimer) {
+            clearTimeout(pendingEmitTimer);
+            pendingEmitTimer = null;
+          }
+          lastEmitTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          const sumLoaded = loadedPerChunk.reduce((a, b) => a + b, 0);
+          const currentTotal = expectedTotalSize || sumLoaded;
+          this.latestProgress = {
+            loaded: sumLoaded,
+            total: currentTotal,
+            percent: currentTotal > 0 ? Math.min(100, Math.round((sumLoaded / currentTotal) * 100)) : 0,
+            completedChunks,
+            totalChunks: chunkCount
+          };
+          this.emit('download_progress', this.latestProgress);
+        };
+
+        const emitProgress = (force = false) => {
+          if (force) {
+            doEmit();
+            return;
+          }
+          const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          const elapsed = now - lastEmitTime;
+          if (elapsed >= 50) {
+            doEmit();
+          } else if (!pendingEmitTimer) {
+            pendingEmitTimer = setTimeout(() => {
+              doEmit();
+            }, 50 - elapsed);
+          }
+        };
+
+        // Immediately emit 0 progress so UI starts from 0.0 MB in real-time
+        emitProgress(true);
+
         const downloadChunk = async (url: string, index: number) => {
           const resp = await fetch(url);
           if (!resp.ok) {
             throw new Error(`Failed to download model chunk ${index} from ${url}: ${resp.statusText}`);
           }
-          const contentLength = resp.headers.get('content-length');
-          const chunkSize = contentLength ? parseInt(contentLength, 10) : 0;
 
-          if (resp.body && chunkSize > 0) {
+          // Use ReadableStream reader whenever body is available (independent of CORS Content-Length headers)
+          if (resp.body) {
             const reader = resp.body.getReader();
             const parts: Uint8Array[] = [];
             let chunkLoaded = 0;
@@ -299,17 +339,7 @@ export class StreamRecognizer {
                 parts.push(value);
                 chunkLoaded += value.length;
                 loadedPerChunk[index] = chunkLoaded;
-
-                const sumLoaded = loadedPerChunk.reduce((a, b) => a + b, 0);
-                const currentTotal = expectedTotalSize || sumLoaded;
-                this.latestProgress = {
-                  loaded: sumLoaded,
-                  total: currentTotal,
-                  percent: Math.min(100, Math.round((sumLoaded / currentTotal) * 100)),
-                  completedChunks,
-                  totalChunks: chunkCount
-                };
-                this.emit('download_progress', this.latestProgress);
+                emitProgress(false);
               }
             }
 
@@ -327,20 +357,12 @@ export class StreamRecognizer {
           }
 
           completedChunks++;
-          const sumLoaded = loadedPerChunk.reduce((a, b) => a + b, 0);
-          const currentTotal = expectedTotalSize || sumLoaded;
-          this.latestProgress = {
-            loaded: sumLoaded,
-            total: currentTotal,
-            percent: Math.min(100, Math.round((sumLoaded / currentTotal) * 100)),
-            completedChunks,
-            totalChunks: chunkCount
-          };
-          this.emit('download_progress', this.latestProgress);
+          emitProgress(true);
         };
 
         // Parallel download all chunks
         await Promise.all(chunkUrls.map((url, i) => downloadChunk(url, i)));
+        emitProgress(true);
 
         // Stitch all chunks in memory into a single continuous buffer
         const totalBytes = chunkBuffers.reduce((sum, c) => sum + c.length, 0);
@@ -361,10 +383,50 @@ export class StreamRecognizer {
         const contentLength = resp.headers.get('content-length');
         const total = contentLength ? parseInt(contentLength, 10) : 0;
 
-        if (resp.body && total > 0) {
+        if (resp.body) {
           const reader = resp.body.getReader();
           const chunks: Uint8Array[] = [];
           let loaded = 0;
+          let lastSingleEmit = 0;
+          let singleTimer: any = null;
+
+          const emitSingle = (force = false) => {
+            const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            if (force) {
+              if (singleTimer) {
+                clearTimeout(singleTimer);
+                singleTimer = null;
+              }
+              lastSingleEmit = now;
+              this.latestProgress = {
+                loaded,
+                total: total || loaded,
+                percent: total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0
+              };
+              this.emit('download_progress', this.latestProgress);
+              return;
+            }
+            const elapsed = now - lastSingleEmit;
+            if (elapsed >= 50) {
+              if (singleTimer) {
+                clearTimeout(singleTimer);
+                singleTimer = null;
+              }
+              lastSingleEmit = now;
+              this.latestProgress = {
+                loaded,
+                total: total || loaded,
+                percent: total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0
+              };
+              this.emit('download_progress', this.latestProgress);
+            } else if (!singleTimer) {
+              singleTimer = setTimeout(() => {
+                emitSingle(true);
+              }, 50 - elapsed);
+            }
+          };
+
+          emitSingle(true);
 
           while (true) {
             const { done, value } = await reader.read();
@@ -372,14 +434,10 @@ export class StreamRecognizer {
             if (value) {
               chunks.push(value);
               loaded += value.length;
-              this.latestProgress = {
-                loaded,
-                total,
-                percent: Math.min(100, Math.round((loaded / total) * 100))
-              };
-              this.emit('download_progress', this.latestProgress);
+              emitSingle(false);
             }
           }
+          emitSingle(true);
 
           const combined = new Uint8Array(loaded);
           let offset = 0;
