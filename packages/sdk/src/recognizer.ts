@@ -480,17 +480,26 @@ export class StreamRecognizer {
     }
 
     let pcm16k = inputPcm;
+    let isOwned = false;
     if (inputSampleRate !== 16000) {
       if (!this.resampler) {
         this.resampler = new AudioResampler(inputSampleRate, 16000);
       }
       pcm16k = this.resampler.process(inputPcm);
+      isOwned = (pcm16k !== inputPcm);
     }
 
-    this.worker.postMessage({
-      type: 'FEED_AUDIO',
-      payload: { samples: pcm16k, isFinal }
-    });
+    if (isOwned && pcm16k.buffer) {
+      this.worker.postMessage({
+        type: 'FEED_AUDIO',
+        payload: { samples: pcm16k, isFinal }
+      }, [pcm16k.buffer]);
+    } else {
+      this.worker.postMessage({
+        type: 'FEED_AUDIO',
+        payload: { samples: pcm16k, isFinal }
+      });
+    }
   }
 
   /**

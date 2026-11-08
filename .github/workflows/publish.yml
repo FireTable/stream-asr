@@ -1,4 +1,15 @@
-name: Publish Package to NPM
+name: Publish Package to NPM (@firetable/stream-asr)
+
+# 触发方式:
+#   - 推送 tag `vX.Y.Z` (由 `pnpm bump:patch|minor|major --tag` 生成) -> 构建、测试并发布 npm 包 @firetable/stream-asr
+#   - workflow_dispatch -> 手动触发; 默认 dry-run (只构建 + npm publish --dry-run), 取消勾选才真发布
+#
+# 认证模式:
+#   1. 推荐：npm Trusted Publishing (OIDC)，无需在 GitHub 仓库配置静态 NPM_TOKEN secret。
+#      - 需要 id-token: write + GitHub-hosted runner + Node >= 22.14 + npm CLI >= 11.5.1。
+#      - npm CLI 发现 OIDC 环境会自动换取短期凭证并自动生成 provenance。
+#      - 一次性准备：在 npmjs.com 包 Settings -> Trusted publishing 绑定本仓库 (FireTable/stream-asr, workflow: publish.yml)。
+#   2. 兼容模式：如果仓库配置了 secrets.NPM_TOKEN，会自动通过 NODE_AUTH_TOKEN 进行回退发布。
 
 on:
   push:
@@ -7,63 +18,121 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run (verify build and package contents without publishing to npm)'
-        type: boolean
+        description: 'Dry run (build + npm publish --dry-run, no real publish)'
         required: false
-        default: false
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: write
+  id-token: write # npm Trusted Publishing (OIDC 短期凭证 + 自动 provenance)
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      id-token: write
-
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/sdk
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Enable corepack (pnpm)
+        working-directory: .
+        run: corepack enable
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          registry-url: 'https://registry.npmjs.org'
+          node-version: 24
           cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Ensure npm >= 11.5.1
+        working-directory: .
+        run: |
+          npm i -g npm@latest
+          NPM_V=$(npm --version)
+          echo "npm $NPM_V / node $(node --version)"
+          node -e "const [a,b,c]=process.argv[1].split('.').map(Number);if(a<11||(a===11&&(b<5||(b===5&&c<1)))){console.error('npm >= 11.5.1 required for trusted publishing');process.exit(1)}" "$NPM_V"
 
       - name: Install dependencies
+        working-directory: .
         run: pnpm install --frozen-lockfile
 
-      - name: Build SDK (@firetable/stream-asr)
-        run: pnpm build:sdk
+      - name: Read package metadata
+        id: meta
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Package: $NAME@$VERSION"
+
+      - name: Verify tag matches package.json version
+        if: github.ref_type == 'tag'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="${{ steps.meta.outputs.version }}"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} (=$TAG_VERSION) does not match packages/sdk/package.json version ($PKG_VERSION)."
+            exit 1
+          fi
+
+      - name: Verify tag commit is on main
+        if: github.ref_type == 'tag'
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Tag commit $GITHUB_SHA is not reachable from origin/main; refusing to publish."
+            exit 1
+          fi
+
+      - name: Typecheck SDK
+        run: pnpm run type-check
+
+      - name: Build SDK
+        run: pnpm run build
 
       - name: Run Verification Tests
+        working-directory: .
         run: pnpm test
 
-      - name: Publish to NPM (Dry Run)
-        if: ${{ inputs.dry_run == true }}
+      - name: Check whether this version is already published
+        id: published
         run: |
-          cd packages/sdk
-          pnpm publish --access public --no-git-checks --dry-run
+          if npm view "${{ steps.meta.outputs.name }}@${{ steps.meta.outputs.version }}" version >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ steps.meta.outputs.name }}@${{ steps.meta.outputs.version }} is already on npm; skipping publish."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Choose dist-tag
+        id: disttag
+        run: |
+          if [[ "${{ steps.meta.outputs.version }}" == *-* ]]; then echo "tag=next" >> "$GITHUB_OUTPUT"; else echo "tag=latest" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Publish (dry run)
+        if: steps.published.outputs.exists != 'true' && ((github.event_name == 'workflow_dispatch' && inputs.dry_run) || false)
+        run: npm publish --access public --tag "${{ steps.disttag.outputs.tag }}" --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish to NPM (Public Release)
-        if: ${{ inputs.dry_run != true }}
-        run: |
-          cd packages/sdk
-          pnpm publish --access public --no-git-checks --provenance
+      - name: Publish to npm
+        if: steps.published.outputs.exists != 'true' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+        run: npm publish --access public --tag "${{ steps.disttag.outputs.tag }}"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') && inputs.dry_run != true
+        if: github.ref_type == 'tag' && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true

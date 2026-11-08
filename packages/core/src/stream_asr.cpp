@@ -660,6 +660,8 @@ struct VadDecoder {
                 inSpeech = true;
                 evt.type = SegmentEvent::START;
                 evt.frame = std::max(0, currentFrame - beginWindow + 1);
+                endQueue.clear();
+                endVoiceCount = 0;
             }
         } else {
             int endWinSz = static_cast<int>(endQueue.size());
@@ -818,6 +820,9 @@ struct StreamSpeechPipeline {
     std::vector<float> pendingRefinePcm;
     int pendingRefineSegIndex = -1;
     int tailVadState = 0;
+    bool streamActive = false;
+    std::vector<float> preRollPcm;
+    static constexpr size_t MAX_PRE_ROLL_SAMPLES = 10240; // 640ms @ 16kHz (exactly 2 chunks of 32 frames)
 
     void rebuildUniversalTranscript() {
         universalTranscript.clear();
@@ -1380,6 +1385,8 @@ STREAM_ASR_EXPORT void stream_asr_reset_universal_stream() {
     gPipeline.pendingRefinePcm.clear();
     gPipeline.pendingRefineSegIndex = -1;
     gPipeline.tailVadState = 0;
+    gPipeline.streamActive = false;
+    gPipeline.preRollPcm.clear();
 }
 
 STREAM_ASR_EXPORT const char* stream_asr_accept_waveform_universal(const float* samples, int numSamples, int isFinal) {
@@ -1396,18 +1403,9 @@ STREAM_ASR_EXPORT const char* stream_asr_accept_waveform_universal(const float* 
         scaleToNormalizedPcm(samples, numSamples, normPcm);
         gPipeline.vadFbank.wavBuf.insert(gPipeline.vadFbank.wavBuf.end(), normPcm.begin(), normPcm.end());
         gPipeline.vadSegmenter.addSamples(numSamples);
-
-        // Accumulate active sentence PCM for asynchronous Two-Pass refinement
-        if (gPipeline.config.enableTwoPass) {
-            const size_t MAX_TWO_PASS_BUF = static_cast<size_t>(gPipeline.vadSegmenter.maxSegmentSamples);
-            if (gPipeline.curSentencePcm.size() + numSamples <= MAX_TWO_PASS_BUF) {
-                gPipeline.curSentencePcm.insert(gPipeline.curSentencePcm.end(), samples, samples + numSamples);
-            }
-        }
-
-        stream_asr_accept_waveform(samples, numSamples, 0);
     }
 
+    bool segmentStarted = false;
     bool segmentEnded = false;
     while (static_cast<int>(gPipeline.vadFbank.wavBuf.size()) >= MelBankFeature::STFT_WIN) {
         float mel84[MelBankFeature::NUM_MEL_BINS];
@@ -1417,7 +1415,9 @@ STREAM_ASR_EXPORT const char* stream_asr_accept_waveform_universal(const float* 
         gPipeline.tailVadState = gPipeline.tailVadProbe.processFrame(prob, false);
         auto evt = gPipeline.vadDecoder.processFrame(prob, false);
 
-        if (evt.type == VadDecoder::SegmentEvent::END ||
+        if (evt.type == VadDecoder::SegmentEvent::START) {
+            segmentStarted = true;
+        } else if (evt.type == VadDecoder::SegmentEvent::END ||
             gPipeline.vadSegmenter.curSegmentSamples >= gPipeline.vadSegmenter.maxSegmentSamples) {
             segmentEnded = true;
         }
@@ -1426,22 +1426,75 @@ STREAM_ASR_EXPORT const char* stream_asr_accept_waveform_universal(const float* 
                                         gPipeline.vadFbank.wavBuf.begin() + MelBankFeature::STFT_SHIFT);
     }
 
-    if (segmentEnded) {
-        stream_asr_accept_waveform(nullptr, 0, 1);
-        std::string segText = gPipeline.lastTranscript;
-        if (!segText.empty()) {
-            int segIdx = static_cast<int>(gPipeline.universalSegments.size());
-            gPipeline.universalSegments.push_back(segText);
-            gPipeline.rebuildUniversalTranscript();
-
-            // Prepare asynchronous refinement buffer (non-blocking)
-            if (gPipeline.config.enableTwoPass && gPipeline.noStreamDecMod && !gPipeline.curSentencePcm.empty()) {
-                gPipeline.pendingRefinePcm = std::move(gPipeline.curSentencePcm);
-                gPipeline.pendingRefineSegIndex = segIdx;
+    // Gated audio routing:
+    // If not currently in active speech, buffer samples in preRollPcm until speech onset is confirmed.
+    if (!gPipeline.streamActive) {
+        if (segmentStarted || gPipeline.vadDecoder.inSpeech) {
+            gPipeline.streamActive = true;
+            gPipeline.vadSegmenter.reset();
+            if (!gPipeline.preRollPcm.empty()) {
+                if (gPipeline.config.enableTwoPass) {
+                    const size_t MAX_TWO_PASS_BUF = static_cast<size_t>(gPipeline.vadSegmenter.maxSegmentSamples);
+                    if (gPipeline.curSentencePcm.size() + gPipeline.preRollPcm.size() <= MAX_TWO_PASS_BUF) {
+                        gPipeline.curSentencePcm.insert(gPipeline.curSentencePcm.end(),
+                                                       gPipeline.preRollPcm.begin(), gPipeline.preRollPcm.end());
+                    }
+                }
+                stream_asr_accept_waveform(gPipeline.preRollPcm.data(), static_cast<int>(gPipeline.preRollPcm.size()), 0);
+                gPipeline.preRollPcm.clear();
+            }
+            if (samples && numSamples > 0) {
+                if (gPipeline.config.enableTwoPass) {
+                    const size_t MAX_TWO_PASS_BUF = static_cast<size_t>(gPipeline.vadSegmenter.maxSegmentSamples);
+                    if (gPipeline.curSentencePcm.size() + numSamples <= MAX_TWO_PASS_BUF) {
+                        gPipeline.curSentencePcm.insert(gPipeline.curSentencePcm.end(), samples, samples + numSamples);
+                    }
+                }
+                stream_asr_accept_waveform(samples, numSamples, 0);
+            }
+        } else {
+            // Still in IDLE silence: buffer samples into preRollPcm and DO NOT run heavy Transformer
+            if (samples && numSamples > 0) {
+                gPipeline.preRollPcm.insert(gPipeline.preRollPcm.end(), samples, samples + numSamples);
+                if (gPipeline.preRollPcm.size() > StreamSpeechPipeline::MAX_PRE_ROLL_SAMPLES) {
+                    size_t excess = gPipeline.preRollPcm.size() - StreamSpeechPipeline::MAX_PRE_ROLL_SAMPLES;
+                    gPipeline.preRollPcm.erase(gPipeline.preRollPcm.begin(), gPipeline.preRollPcm.begin() + excess);
+                }
             }
         }
-        gPipeline.curSentencePcm.clear();
-        stream_asr_reset_stream();
+    } else {
+        // Speech stream is active: feed audio directly to maintain continuous causal KV-cache & RoPE timing
+        if (samples && numSamples > 0) {
+            if (gPipeline.config.enableTwoPass) {
+                const size_t MAX_TWO_PASS_BUF = static_cast<size_t>(gPipeline.vadSegmenter.maxSegmentSamples);
+                if (gPipeline.curSentencePcm.size() + numSamples <= MAX_TWO_PASS_BUF) {
+                    gPipeline.curSentencePcm.insert(gPipeline.curSentencePcm.end(), samples, samples + numSamples);
+                }
+            }
+            stream_asr_accept_waveform(samples, numSamples, 0);
+        }
+    }
+
+    if (segmentEnded) {
+        if (gPipeline.streamActive) {
+            stream_asr_accept_waveform(nullptr, 0, 1);
+            std::string segText = gPipeline.lastTranscript;
+            if (!segText.empty()) {
+                int segIdx = static_cast<int>(gPipeline.universalSegments.size());
+                gPipeline.universalSegments.push_back(segText);
+                gPipeline.rebuildUniversalTranscript();
+
+                // Prepare asynchronous refinement buffer (non-blocking)
+                if (gPipeline.config.enableTwoPass && gPipeline.noStreamDecMod && !gPipeline.curSentencePcm.empty()) {
+                    gPipeline.pendingRefinePcm = std::move(gPipeline.curSentencePcm);
+                    gPipeline.pendingRefineSegIndex = segIdx;
+                }
+            }
+            gPipeline.curSentencePcm.clear();
+            stream_asr_reset_stream();
+            gPipeline.streamActive = false;
+        }
+        gPipeline.preRollPcm.clear();
         gPipeline.vadSegmenter.reset();
         gPipeline.vadDecoder.reset();
     }
@@ -1460,21 +1513,32 @@ STREAM_ASR_EXPORT const char* stream_asr_accept_waveform_universal(const float* 
             gPipeline.vadDecoder.processFrame(0.0f, true);
         }
 
-        stream_asr_accept_waveform(nullptr, 0, 1);
-        std::string finalSeg = gPipeline.lastTranscript;
-        if (!finalSeg.empty()) {
-            int segIdx = static_cast<int>(gPipeline.universalSegments.size());
-            gPipeline.universalSegments.push_back(finalSeg);
-            gPipeline.rebuildUniversalTranscript();
-
-            // Prepare asynchronous refinement buffer (non-blocking)
-            if (gPipeline.config.enableTwoPass && gPipeline.noStreamDecMod && !gPipeline.curSentencePcm.empty()) {
-                gPipeline.pendingRefinePcm = std::move(gPipeline.curSentencePcm);
-                gPipeline.pendingRefineSegIndex = segIdx;
-            }
+        // If audio ended before beginWindow filled (e.g. short audio clip), flush preRoll buffer if voice detected
+        if (!gPipeline.streamActive && !gPipeline.preRollPcm.empty() && (gPipeline.tailVadProbe.voiceCount > 0 || gPipeline.vadDecoder.inSpeech)) {
+            gPipeline.streamActive = true;
+            stream_asr_accept_waveform(gPipeline.preRollPcm.data(), static_cast<int>(gPipeline.preRollPcm.size()), 0);
+            gPipeline.preRollPcm.clear();
         }
-        gPipeline.curSentencePcm.clear();
-        stream_asr_reset_stream();
+
+        if (gPipeline.streamActive) {
+            stream_asr_accept_waveform(nullptr, 0, 1);
+            std::string finalSeg = gPipeline.lastTranscript;
+            if (!finalSeg.empty()) {
+                int segIdx = static_cast<int>(gPipeline.universalSegments.size());
+                gPipeline.universalSegments.push_back(finalSeg);
+                gPipeline.rebuildUniversalTranscript();
+
+                // Prepare asynchronous refinement buffer (non-blocking)
+                if (gPipeline.config.enableTwoPass && gPipeline.noStreamDecMod && !gPipeline.curSentencePcm.empty()) {
+                    gPipeline.pendingRefinePcm = std::move(gPipeline.curSentencePcm);
+                    gPipeline.pendingRefineSegIndex = segIdx;
+                }
+            }
+            gPipeline.curSentencePcm.clear();
+            stream_asr_reset_stream();
+            gPipeline.streamActive = false;
+        }
+        gPipeline.preRollPcm.clear();
         gPipeline.vadSegmenter.reset();
         gPipeline.vadDecoder.reset();
     }

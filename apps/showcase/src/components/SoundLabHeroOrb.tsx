@@ -497,8 +497,8 @@ export default function SoundLabHeroOrb() {
       const source = audioCtx.createMediaStreamSource(stream);
       audioSourceRef.current = source;
 
-      // Use 4096 buffer size for stable, smooth streaming
-      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      // Use 2048 buffer size (~42ms @ 48kHz) for ultra-low latency streaming without audio dropouts
+      const processor = audioCtx.createScriptProcessor(2048, 1, 1);
       processorRef.current = processor;
 
       processor.onaudioprocess = (e) => {
